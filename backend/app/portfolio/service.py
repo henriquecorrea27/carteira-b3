@@ -9,7 +9,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Asset, Transaction
+from app.models import Asset, CorporateEvent, Transaction
 from app.portfolio.engine import LedgerEntry, LedgerError, PortfolioResult, build_portfolio
 from app.portfolio.tax import default_tax_table
 from app.portfolio.tickers import infer_asset_class
@@ -141,6 +141,11 @@ def delete_transaction(session: Session, transaction_id: int) -> None:
     if row is None:
         raise TransactionNotFoundError(transaction_id)
     _replay([r.to_entry() for r in _all_rows(session) if r.id != transaction_id])
+    if row.source == TransactionSource.AUTO.value and row.dedup_hash:
+        # Deleting an automatic row is a manual decision: never generate that event again
+        event = session.scalar(select(CorporateEvent).where(CorporateEvent.event_key == row.dedup_hash))
+        if event is not None:
+            event.dismissed = True
     session.delete(row)
     session.commit()
 

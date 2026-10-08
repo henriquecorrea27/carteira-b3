@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
 import { CalendarClock } from "lucide-react";
-import { useDividends, useEquitySeries, usePositions, useSummary } from "@/api/hooks";
+import { useAgendaEstimates, useDividends, useEquitySeries, usePositions, useSummary } from "@/api/hooks";
 import type { Decision, Position } from "@/api/types";
 import { AllocationStrip } from "@/components/charts/AllocationStrip";
 import { DividendBars } from "@/components/charts/DividendBars";
@@ -114,7 +114,8 @@ function UpcomingDividends() {
   const { data, isPending } = useDividends();
   const summary = useSummary();
   const today = summary.data?.as_of ?? new Date().toISOString().slice(0, 10);
-  const items = data ? agenda(data, today).slice(0, 6) : [];
+  const estimates = useAgendaEstimates();
+  const items = data ? agenda(data, today, estimates.data ?? []).slice(0, 6) : [];
   return (
     <Panel className="flex flex-col">
       <PanelHeader

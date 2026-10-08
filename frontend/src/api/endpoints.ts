@@ -171,17 +171,25 @@ function toDividend(p: W.Provent): Dividend {
   };
 }
 
-async function getPending(): Promise<PendingItem[]> {
-  const bonuses = await http.get<W.Transaction[]>("/transactions", { type: "BONUS" });
-  return bonuses
-    .filter((t) => t.price === null)
-    .map((t) => ({
-      id: `bonus-${t.id}`,
-      kind: "BONUS_NO_COST" as const,
-      ticker: t.ticker,
-      date: t.date,
-      message: `Bonificação de ${t.quantity.replace(".", ",")} ações sem custo atribuído — informe o valor do aviso aos acionistas.`,
-      transaction_id: t.id,
+/** Announced cash events whose data-com is still ahead, as estimated agenda entries. */
+async function getAgendaEstimates(): Promise<Dividend[]> {
+  const items = await http.get<W.AgendaItem[]>("/provents/agenda");
+  return items
+    .filter((i) => !i.in_ledger && i.estimated_net !== null)
+    .map((i, index) => ({
+      id: -(index + 1),
+      ticker: i.ticker,
+      asset_class: "STOCK" as const,
+      type: i.kind as Dividend["type"],
+      status: "ANNOUNCED" as const,
+      ex_date: i.record_date,
+      pay_date: i.payment_date,
+      quantity: i.quantity,
+      amount_per_share: i.value,
+      gross: i.estimated_net!,
+      tax: "0",
+      net: i.estimated_net!,
+      source: "AUTO" as const,
     }));
 }
 
@@ -254,7 +262,8 @@ export const api = {
     USE_MOCKS
       ? mock((s) => s.positions())
       : http.get<W.Position[]>("/portfolio/positions").then((ps) => ps.map(toPosition)),
-  getPending: (): Promise<PendingItem[]> => (USE_MOCKS ? mock((s) => s.pending()) : getPending()),
+  getPending: (): Promise<PendingItem[]> =>
+    USE_MOCKS ? mock((s) => s.pending()) : http.get<PendingItem[]>("/portfolio/pending"),
   getEquitySeries: (): Promise<EquityPoint[]> =>
     USE_MOCKS
       ? mock((s) => s.equitySeries())
@@ -306,6 +315,7 @@ export const api = {
   // Dividends
   getDividends: (): Promise<Dividend[]> =>
     USE_MOCKS ? mock((s) => s.dividends()) : http.get<W.Provent[]>("/provents").then((ps) => ps.map(toDividend)),
+  getAgendaEstimates: (): Promise<Dividend[]> => (USE_MOCKS ? Promise.resolve([]) : getAgendaEstimates()),
 
   // Assets & analysis
   searchAssets: (q: string): Promise<AssetSearchResult[]> =>
@@ -321,9 +331,10 @@ export const api = {
   refreshPrices: (): Promise<{ updated: number; failed: number }> =>
     USE_MOCKS
       ? mock((s) => s.refreshPrices())
-      : http
-          .post<W.Refresh>("/market-data/refresh")
-          .then((r) => ({ updated: r.prices_inserted, failed: r.errors.length })),
+      : Promise.all([
+          http.post<W.Refresh>("/market-data/refresh"),
+          http.post<W.EventsSync>("/corporate-events/sync"),
+        ]).then(([r, e]) => ({ updated: r.prices_inserted, failed: r.errors.length + e.errors.length })),
 
   // Import
   previewImport: (file: File): Promise<ImportPreview> =>

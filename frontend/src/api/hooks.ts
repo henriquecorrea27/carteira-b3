@@ -10,6 +10,7 @@ export const queryKeys = {
   returns: ["portfolio", "returns"] as const,
   transactions: (f: TransactionFilters) => ["transactions", f] as const,
   dividends: ["dividends"] as const,
+  agendaEstimates: ["dividends", "agenda-estimates"] as const,
   search: (q: string) => ["assets", "search", q] as const,
   analysis: (t: string) => ["analysis", t] as const,
   priceBars: (t: string) => ["prices", t] as const,
@@ -21,6 +22,8 @@ export const usePending = () => useQuery({ queryKey: queryKeys.pending, queryFn:
 export const useEquitySeries = () => useQuery({ queryKey: queryKeys.equity, queryFn: api.getEquitySeries });
 export const useReturnSeries = () => useQuery({ queryKey: queryKeys.returns, queryFn: api.getReturnSeries });
 export const useDividends = () => useQuery({ queryKey: queryKeys.dividends, queryFn: api.getDividends });
+export const useAgendaEstimates = () =>
+  useQuery({ queryKey: queryKeys.agendaEstimates, queryFn: api.getAgendaEstimates });
 
 export const useTransactions = (filters: TransactionFilters) =>
   useQuery({
@@ -98,6 +101,8 @@ export function useRefreshPrices() {
       Promise.all([
         qc.invalidateQueries({ queryKey: ["portfolio"] }),
         qc.invalidateQueries({ queryKey: ["prices"] }),
+        qc.invalidateQueries({ queryKey: ["dividends"] }),
+        qc.invalidateQueries({ queryKey: ["transactions"] }),
         qc.invalidateQueries({ queryKey: ["analysis"] }),
       ]),
   });

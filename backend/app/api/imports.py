@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_session
+from app.corporate_events.service import apply_events
 from app.importers import service
 from app.importers.base import RowStatus
 from app.schemas.imports import ImportReportOut, ImportRowOut
@@ -83,6 +84,7 @@ async def commit(
 ):
     try:
         analysis = service.commit(session, await _read(files), include_possible_duplicates)
+        apply_events(session)
     except service.UnknownFileError as err:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(err)) from err
     return _report(analysis, committed=True)

@@ -12,7 +12,7 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
 | F0 — Setup (repo, PostgreSQL, FastAPI + Alembic, frontend) | ✅ |
 | F1 — Motor de carteira, lançamentos manuais (individual e lote), testes numéricos | ✅ |
 | F2 — Preços, CDI, painel completo | ✅ |
-| F3 — Proventos e eventos automáticos | ⏳ |
+| F3 — Proventos e eventos automáticos | ✅ |
 | F4 — Importador B3 | ✅ backend + tela de importação |
 | F5–F8 | ⏳ |
 
@@ -49,6 +49,7 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
 5. Atualizar cotações, IBOV e CDI (também pelo botão "Atualizar preços"):
    ```
    cd backend && uv run python -m app.jobs.update_prices
+   cd backend && uv run python -m app.jobs.sync_corporate_events   # proventos e eventos da B3
    ```
    Abrir http://localhost:5180.
 
@@ -71,6 +72,11 @@ cd frontend && npm run test
 | GET | `/api/portfolio/summary` | Resumo da carteira |
 | GET | `/api/assets/search?q=` | Autocomplete de ativos |
 | PATCH | `/api/assets/{ticker}` | Ajustar classe/setor/nome do ativo |
+| GET | `/api/portfolio/history`, `/api/portfolio/allocation` | Evolução (TWR vs IBOV/CDI) e alocação |
+| GET | `/api/provents`, `/api/provents/summary`, `/api/provents/agenda` | Proventos, resumo e agenda |
+| GET | `/api/portfolio/pending` | Pendências (bonificação sem custo, evento não reconhecido) |
+| POST | `/api/market-data/refresh`, `/api/corporate-events/sync` | Atualizar cotações / eventos da B3 |
+| POST | `/api/import/b3/preview`, `/api/import/b3/commit` | Importar extratos da B3 |
 
 Valores monetários e quantidades trafegam como **string decimal** (nunca float).
 

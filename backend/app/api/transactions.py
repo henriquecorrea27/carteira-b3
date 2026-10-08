@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_session
+from app.corporate_events.service import apply_events
 from app.portfolio import service
 from app.portfolio.tickers import InvalidTickerError, normalize_ticker
 from app.portfolio.types import TransactionSource, TransactionType
@@ -41,7 +42,9 @@ def list_transactions(
 @router.post("", response_model=TransactionOut, status_code=status.HTTP_201_CREATED)
 def create_transaction(payload: TransactionIn, session: SessionDep):
     try:
-        return service.create_transactions(session, [payload])[0]
+        created = service.create_transactions(session, [payload])[0]
+        apply_events(session)
+        return created
     except service.LedgerValidationError as err:
         raise _ledger_error(err) from err
 
@@ -49,7 +52,9 @@ def create_transaction(payload: TransactionIn, session: SessionDep):
 @router.post("/batch", response_model=list[TransactionOut], status_code=status.HTTP_201_CREATED)
 def create_batch(payload: TransactionBatchIn, session: SessionDep):
     try:
-        return service.create_transactions(session, payload.items)
+        created = service.create_transactions(session, payload.items)
+        apply_events(session)
+        return created
     except service.LedgerValidationError as err:
         raise _ledger_error(err) from err
 
@@ -57,7 +62,9 @@ def create_batch(payload: TransactionBatchIn, session: SessionDep):
 @router.put("/{transaction_id}", response_model=TransactionOut)
 def update_transaction(transaction_id: int, payload: TransactionIn, session: SessionDep):
     try:
-        return service.update_transaction(session, transaction_id, payload)
+        updated = service.update_transaction(session, transaction_id, payload)
+        apply_events(session)
+        return updated
     except service.TransactionNotFoundError as err:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "lançamento não encontrado") from err
     except service.LedgerValidationError as err:
@@ -68,6 +75,7 @@ def update_transaction(transaction_id: int, payload: TransactionIn, session: Ses
 def delete_transaction(transaction_id: int, session: SessionDep):
     try:
         service.delete_transaction(session, transaction_id)
+        apply_events(session)
     except service.TransactionNotFoundError as err:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "lançamento não encontrado") from err
     except service.LedgerValidationError as err:

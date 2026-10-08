@@ -1,0 +1,21 @@
+[
+ {
+  "stockCapital": "1,00",
+  "quotedPerSharSince": "03/11/2008",
+  "commonSharesForm": "",
+  "preferredSharesForm": "Escritural",
+  "hasCommom": "",
+  "hasPreferred": "BANCO BNP PARIBAS BRASIL",
+  "roundLot": "1",
+  "tradingName": "ISHARES BOVA",
+  "numberCommonShares": "0",
+  "numberPreferredShares": "8.815.059.524",
+  "totalNumberShares": "8.815.059.524",
+  "code": "BOVA",
+  "codeCVM": "0",
+  "segment": "BOLSA",
+  "cashDividends": [],
+  "stockDividends": [],
+  "subscriptions": []
+ }
+]

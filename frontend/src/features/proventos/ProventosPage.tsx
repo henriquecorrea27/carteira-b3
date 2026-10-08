@@ -1,6 +1,6 @@
 import * as React from "react";
 import { CalendarClock, Coins } from "lucide-react";
-import { useDividends, useSummary } from "@/api/hooks";
+import { useAgendaEstimates, useDividends, useSummary } from "@/api/hooks";
 import type { AssetClass, Dividend, DividendStatus } from "@/api/types";
 import { AllocationBars } from "@/components/charts/AllocationStrip";
 import { DividendBars } from "@/components/charts/DividendBars";
@@ -54,7 +54,8 @@ function Summary({ dividends, today }: { dividends: Dividend[]; today: string })
 }
 
 function Agenda({ dividends, today }: { dividends: Dividend[]; today: string }) {
-  const items = agenda(dividends, today);
+  const estimates = useAgendaEstimates();
+  const items = agenda(dividends, today, estimates.data ?? []);
   return (
     <Panel className="flex flex-col">
       <PanelHeader title="Agenda" description="Próximas datas-com e pagamentos" />

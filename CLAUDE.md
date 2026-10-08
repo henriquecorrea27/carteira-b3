@@ -63,6 +63,8 @@ cd backend && uv run alembic upgrade head          # aplica migrações
 cd backend && uv run python -m uvicorn app.main:app --reload # API em http://localhost:8000 (docs em /docs)
 cd backend && uv run pytest                        # testes (usa o banco carteira_test)
 cd backend && uv run ruff check . && uv run ruff format .
+cd backend && uv run python -m app.jobs.update_prices          # cotações, IBOV e CDI
+cd backend && uv run python -m app.jobs.sync_corporate_events  # proventos e eventos da B3
 cd backend && uv run python -m app.jobs.daily_report   # (F7) relatório diário manual
 cd frontend && npm run dev                         # UI em http://localhost:5180 (proxy /api → :8000)
 ```
@@ -196,6 +198,23 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 5. **Bonificação:** quantidade aplicada automaticamente. Se a fonte não trouxer o **custo atribuído**, o evento fica **"pendente de custo"** no painel até o usuário informar o valor (está no aviso aos acionistas da empresa). Enquanto pendente, o PM do ativo aparece com aviso.
 6. Lançamentos automáticos têm `source = AUTO`, são editáveis, e **edição manual sempre prevalece**: o job não sobrescreve um evento que o usuário alterou.
 7. Mudanças nas operações (ex.: compra lançada com data retroativa) disparam recálculo dos proventos afetados.
+
+**Implementação (F3, `app/corporate_events/`):** formato da fonte documentado em
+`backend/tests/fixtures/b3_events/README.md` (respostas reais salvas).
+- Eventos ficam em cache (`corporate_events`); `apply_events` gera/atualiza/remove os lançamentos `AUTO`
+  (`dedup_hash` = chave do evento) e roda após toda escrita no livro e após cada sincronização.
+- A fonte só traz proventos em dinheiro dos últimos ~12 meses → o histórico antigo vem da Movimentação B3.
+  Por isso a sincronização só consulta empresas com posição aberta ou negociadas nos últimos ~13 meses.
+- Data-com futura: aparece só na agenda (estimativa com a posição atual); o lançamento é criado depois dela.
+- Valor bruto = qtd × valor por ação **truncado** no centavo; IR do JCP pela tabela de vigência.
+- Evento já presente no livro (importado da B3 ou manual, mesmo ticker/tipo, valor por ação ≈ e pagamento
+  em até 5 dias; eventos em ações até 30 dias após a data-com) não é gerado de novo; linhas importadas
+  recebem a data-com (proventos) ou a data-ex (eventos em ações).
+- Data-ex = próximo dia útil da B3 após a data-com (`app/core/calendar.py`, feriados nacionais + 24 e 31/12).
+- Excluir um lançamento `AUTO` dispensa o evento para sempre; editar marca `user_edited` e o job não toca mais.
+- Importar Movimentação depois: proventos que casam com `AUTO` não editado substituem o `AUTO`; com `AUTO`
+  editado, a linha importada é marcada como duplicada.
+- Rótulos não tratados (subscrição, resgate etc.) dos últimos 90 dias viram pendência "evento não reconhecido".
 
 ---
 

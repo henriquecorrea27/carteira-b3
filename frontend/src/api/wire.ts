@@ -168,3 +168,23 @@ export interface ImportReport {
   inserted: number;
   rows: ImportRow[];
 }
+
+export interface AgendaItem {
+  ticker: string;
+  kind: string;
+  label: string;
+  record_date: string;
+  ex_date: string;
+  payment_date: string | null;
+  value: Dec;
+  factor: Dec | null;
+  quantity: Dec;
+  estimated_net: Dec | null;
+  in_ledger: boolean;
+}
+
+export interface EventsSync {
+  issuers: number;
+  events_seen: number;
+  errors: string[];
+}

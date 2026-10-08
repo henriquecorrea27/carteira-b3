@@ -1,0 +1,528 @@
+[
+ {
+  "stockCapital": "120.000.000.000,00",
+  "quotedPerSharSince": "26/01/2004",
+  "commonSharesForm": "Escritural",
+  "preferredSharesForm": "Escritural",
+  "hasCommom": "BRASIL",
+  "hasPreferred": "BRASIL",
+  "roundLot": "100",
+  "tradingName": "BRASIL      ",
+  "numberCommonShares": "5.730.834.040",
+  "numberPreferredShares": "0",
+  "totalNumberShares": "5.730.834.040",
+  "code": "BBAS",
+  "codeCVM": "1023",
+  "segment": "NM",
+  "cashDividends": [
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "11/09/2026",
+    "rate": "0,10245643978",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "10/08/2026",
+    "isinCode": "BRBBASA04OR8",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "11/09/2026",
+    "rate": "0,03450628312",
+    "relatedTo": "3º Trimestre/2026",
+    "approvedOn": "14/08/2026",
+    "isinCode": "BRBBASA04OR8",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "11/09/2026",
+    "rate": "0,00281361809",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "10/08/2026",
+    "isinCode": "BRBBASA04OR8",
+    "label": "RENDIMENTO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "11/09/2026",
+    "rate": "0,10245643978",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "10/08/2026",
+    "isinCode": "BRBBASA05OR5",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "11/09/2026",
+    "rate": "0,03450628312",
+    "relatedTo": "3º Trimestre/2026",
+    "approvedOn": "14/08/2026",
+    "isinCode": "BRBBASA05OR5",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "11/09/2026",
+    "rate": "0,00281361809",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "10/08/2026",
+    "isinCode": "BRBBASA05OR5",
+    "label": "RENDIMENTO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "11/09/2026",
+    "rate": "0,10245643978",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "10/08/2026",
+    "isinCode": "BRBBASACNOR3",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "11/09/2026",
+    "rate": "0,03450628312",
+    "relatedTo": "3º Trimestre/2026",
+    "approvedOn": "14/08/2026",
+    "isinCode": "BRBBASACNOR3",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "11/09/2026",
+    "rate": "0,00281361809",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "10/08/2026",
+    "isinCode": "BRBBASACNOR3",
+    "label": "RENDIMENTO",
+    "lastDatePrior": "01/09/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "11/06/2026",
+    "rate": "0,08157785203",
+    "relatedTo": "1º Trimestre/2026",
+    "approvedOn": "11/05/2026",
+    "isinCode": "BRBBASA04OR8",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/06/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "11/06/2026",
+    "rate": "0,05968401166",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "15/05/2026",
+    "isinCode": "BRBBASA04OR8",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/06/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "11/06/2026",
+    "rate": "0,08157785203",
+    "relatedTo": "1º Trimestre/2026",
+    "approvedOn": "11/05/2026",
+    "isinCode": "BRBBASA05OR5",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/06/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "11/06/2026",
+    "rate": "0,05968401166",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "15/05/2026",
+    "isinCode": "BRBBASA05OR5",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/06/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "11/06/2026",
+    "rate": "0,08157785203",
+    "relatedTo": "1º Trimestre/2026",
+    "approvedOn": "11/05/2026",
+    "isinCode": "BRBBASACNOR3",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/06/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "11/06/2026",
+    "rate": "0,05968401166",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "15/05/2026",
+    "isinCode": "BRBBASACNOR3",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/06/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "11/03/2026",
+    "rate": "0,07014190105",
+    "relatedTo": "1º Trimestre/2026",
+    "approvedOn": "12/02/2026",
+    "isinCode": "BRBBASA04OR8",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "02/03/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "11/03/2026",
+    "rate": "0,07014190105",
+    "relatedTo": "1º Trimestre/2026",
+    "approvedOn": "12/02/2026",
+    "isinCode": "BRBBASA05OR5",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "02/03/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "11/03/2026",
+    "rate": "0,07014190105",
+    "relatedTo": "1º Trimestre/2026",
+    "approvedOn": "12/02/2026",
+    "isinCode": "BRBBASACNOR3",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "02/03/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "05/03/2026",
+    "rate": "0,21630429188",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/02/2026",
+    "isinCode": "BRBBASA04OR8",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "23/02/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "05/03/2026",
+    "rate": "0,00518759764",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/02/2026",
+    "isinCode": "BRBBASA04OR8",
+    "label": "RENDIMENTO",
+    "lastDatePrior": "23/02/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "05/03/2026",
+    "rate": "0,21630429188",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/02/2026",
+    "isinCode": "BRBBASA05OR5",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "23/02/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "05/03/2026",
+    "rate": "0,00518759764",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/02/2026",
+    "isinCode": "BRBBASA05OR5",
+    "label": "RENDIMENTO",
+    "lastDatePrior": "23/02/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "05/03/2026",
+    "rate": "0,21630429188",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/02/2026",
+    "isinCode": "BRBBASACNOR3",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "23/02/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "05/03/2026",
+    "rate": "0,00518759764",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/02/2026",
+    "isinCode": "BRBBASACNOR3",
+    "label": "RENDIMENTO",
+    "lastDatePrior": "23/02/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "12/12/2025",
+    "rate": "0,04583263233",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/11/2025",
+    "isinCode": "BRBBASA04OR8",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "02/12/2025",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "12/12/2025",
+    "rate": "0,04583263233",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/11/2025",
+    "isinCode": "BRBBASA05OR5",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "02/12/2025",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "12/12/2025",
+    "rate": "0,04583263233",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "10/11/2025",
+    "isinCode": "BRBBASACNOR3",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "02/12/2025",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "paymentDate": "11/12/2025",
+    "rate": "0,07192713139",
+    "relatedTo": "3º Trimestre/2025",
+    "approvedOn": "10/11/2025",
+    "isinCode": "BRBBASA04OR8",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/12/2025",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "paymentDate": "11/12/2025",
+    "rate": "0,07192713139",
+    "relatedTo": "3º Trimestre/2025",
+    "approvedOn": "10/11/2025",
+    "isinCode": "BRBBASA05OR5",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/12/2025",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "paymentDate": "11/12/2025",
+    "rate": "0,07192713139",
+    "relatedTo": "3º Trimestre/2025",
+    "approvedOn": "10/11/2025",
+    "isinCode": "BRBBASACNOR3",
+    "label": "JRS CAP PROPRIO",
+    "lastDatePrior": "01/12/2025",
+    "remarks": ""
+   }
+  ],
+  "stockDividends": [
+   {
+    "assetIssued": "BRBBASA04OR8",
+    "factor": "100,00000000000",
+    "approvedOn": "02/02/2024",
+    "isinCode": "BRBBASA04OR8",
+    "label": "DESDOBRAMENTO",
+    "lastDatePrior": "15/04/2024",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASA05OR5",
+    "factor": "100,00000000000",
+    "approvedOn": "02/02/2024",
+    "isinCode": "BRBBASA05OR5",
+    "label": "DESDOBRAMENTO",
+    "lastDatePrior": "15/04/2024",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "factor": "100,00000000000",
+    "approvedOn": "02/02/2024",
+    "isinCode": "BRBBASACNOR3",
+    "label": "DESDOBRAMENTO",
+    "lastDatePrior": "15/04/2024",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "factor": "0,00100000000",
+    "approvedOn": "12/11/2003",
+    "isinCode": "BRBBASACNOR3",
+    "label": "GRUPAMENTO",
+    "lastDatePrior": "23/01/2004",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASN01OR7",
+    "factor": "0,00100000000",
+    "approvedOn": "12/11/2003",
+    "isinCode": "BRBBASN01OR7",
+    "label": "GRUPAMENTO",
+    "lastDatePrior": "23/01/2004",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRBBASN02OR5",
+    "factor": "0,00100000000",
+    "approvedOn": "12/11/2003",
+    "isinCode": "BRBBASN02OR5",
+    "label": "GRUPAMENTO",
+    "lastDatePrior": "23/01/2004",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "20,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASA0NOR9",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "30,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASA0NOR9",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "50,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASA0NOR9",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "20,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASA0NPR6",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "30,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASA0NPR6",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "50,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASA0NPR6",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "20,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASACNOR3",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "30,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASACNOR3",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "50,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASACNOR3",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "20,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASACNPR0",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "30,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASACNPR0",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "",
+    "factor": "50,00000000000",
+    "approvedOn": "17/06/1996",
+    "isinCode": "BRBBASACNPR0",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "17/06/1996",
+    "remarks": ""
+   }
+  ],
+  "subscriptions": [
+   {
+    "assetIssued": "BRBBASACNOR3",
+    "percentage": "9,63440710300",
+    "priceUnit": "22,26000000000",
+    "tradingPeriod": "13/07/2004 a 06/08/2004",
+    "subscriptionDate": "13/08/2004",
+    "approvedOn": "12/07/2004",
+    "isinCode": "BRBBASACNOR3",
+    "label": "SUBSCRICAO",
+    "lastDatePrior": "12/07/2004",
+    "remarks": ""
+   }
+  ]
+ }
+]

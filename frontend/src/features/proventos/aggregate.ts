@@ -76,10 +76,13 @@ export interface AgendaItem {
   dividend: Dividend;
 }
 
-/** Upcoming payments and data-com dates, chronological. */
-export function agenda(dividends: Dividend[], today: string): AgendaItem[] {
+/**
+ * Upcoming payments and data-com dates, chronological. `estimates` are announced events whose data-com
+ * is still ahead (not in the ledger yet): they appear in the agenda only, never in the totals.
+ */
+export function agenda(dividends: Dividend[], today: string, estimates: Dividend[] = []): AgendaItem[] {
   const items: AgendaItem[] = [];
-  for (const d of dividends) {
+  for (const d of [...dividends, ...estimates]) {
     if (d.ex_date >= today) items.push({ date: d.ex_date, kind: "EX_DATE", dividend: d });
     if (d.pay_date && d.pay_date >= today && d.status === "ANNOUNCED") items.push({ date: d.pay_date, kind: "PAYMENT", dividend: d });
     if (!d.pay_date && d.status === "ANNOUNCED" && d.ex_date < today) items.push({ date: d.ex_date, kind: "PAYMENT", dividend: d });

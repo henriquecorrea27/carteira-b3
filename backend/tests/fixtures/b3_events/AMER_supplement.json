@@ -1,0 +1,53 @@
+[
+ {
+  "stockCapital": "39.918.282.260,31",
+  "quotedPerSharSince": "08/08/2007",
+  "commonSharesForm": "Escritural",
+  "preferredSharesForm": "Escritural",
+  "hasCommom": "ITAU CORRETORA ACOES",
+  "hasPreferred": "ITAU CORRETORA ACOES",
+  "roundLot": "100",
+  "tradingName": "AMERICANAS  ",
+  "numberCommonShares": "200.245.299",
+  "numberPreferredShares": "0",
+  "totalNumberShares": "200.245.299",
+  "code": "AMER",
+  "codeCVM": "20990",
+  "segment": "NM",
+  "cashDividends": [],
+  "stockDividends": [
+   {
+    "assetIssued": "BRAMERACNOR6",
+    "factor": "0,01000000000",
+    "approvedOn": "21/05/2024",
+    "isinCode": "BRAMERACNOR6",
+    "label": "GRUPAMENTO",
+    "lastDatePrior": "26/08/2024",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRAMERN01OR0",
+    "factor": "0,01000000000",
+    "approvedOn": "21/05/2024",
+    "isinCode": "BRAMERN01OR0",
+    "label": "GRUPAMENTO",
+    "lastDatePrior": "26/08/2024",
+    "remarks": ""
+   }
+  ],
+  "subscriptions": [
+   {
+    "assetIssued": "BRAMERACNOR6",
+    "percentage": "3.471,77698050000",
+    "priceUnit": "1,30000000000",
+    "tradingPeriod": "22/05/2024 a 18/06/2024",
+    "subscriptionDate": "21/06/2024",
+    "approvedOn": "21/05/2024",
+    "isinCode": "BRAMERACNOR6",
+    "label": "SUBSCRICAO",
+    "lastDatePrior": "21/05/2024",
+    "remarks": ""
+   }
+  ]
+ }
+]

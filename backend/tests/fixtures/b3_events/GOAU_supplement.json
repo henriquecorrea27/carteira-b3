@@ -1,0 +1,214 @@
+[
+ {
+  "stockCapital": "10.997.340.746,29",
+  "quotedPerSharSince": "02/05/2003",
+  "commonSharesForm": "Escritural",
+  "preferredSharesForm": "Escritural",
+  "hasCommom": "BTG PACTUAL SERVIÇOS FINANCEIROS SA DTVM",
+  "hasPreferred": "BTG PACTUAL SERVIÇOS FINANCEIROS SA DTVM",
+  "roundLot": "100",
+  "tradingName": "GERDAU MET  ",
+  "numberCommonShares": "486.802.764",
+  "numberPreferredShares": "835.885.284",
+  "totalNumberShares": "1.322.688.048",
+  "code": "GOAU",
+  "codeCVM": "8656",
+  "segment": "N1",
+  "cashDividends": [
+   {
+    "assetIssued": "BRGOAUACNOR1",
+    "paymentDate": "14/09/2026",
+    "rate": "0,11000000000",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "04/08/2026",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "DIVIDENDO",
+    "lastDatePrior": "19/08/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNPR8",
+    "paymentDate": "14/09/2026",
+    "rate": "0,11000000000",
+    "relatedTo": "2º Trimestre/2026",
+    "approvedOn": "04/08/2026",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "DIVIDENDO",
+    "lastDatePrior": "19/08/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNOR1",
+    "paymentDate": "10/06/2026",
+    "rate": "0,08000000000",
+    "relatedTo": "1º Trimestre/2026",
+    "approvedOn": "27/04/2026",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "DIVIDENDO",
+    "lastDatePrior": "13/05/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNPR8",
+    "paymentDate": "10/06/2026",
+    "rate": "0,08000000000",
+    "relatedTo": "1º Trimestre/2026",
+    "approvedOn": "27/04/2026",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "DIVIDENDO",
+    "lastDatePrior": "13/05/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNOR1",
+    "paymentDate": "19/03/2026",
+    "rate": "0,05000000000",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "23/02/2026",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "DIVIDENDO",
+    "lastDatePrior": "10/03/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNPR8",
+    "paymentDate": "19/03/2026",
+    "rate": "0,05000000000",
+    "relatedTo": "4º Trimestre/2025",
+    "approvedOn": "23/02/2026",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "DIVIDENDO",
+    "lastDatePrior": "10/03/2026",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNOR1",
+    "paymentDate": "12/12/2025",
+    "rate": "0,19000000000",
+    "relatedTo": "3º Trimestre/2025",
+    "approvedOn": "30/10/2025",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "DIVIDENDO",
+    "lastDatePrior": "10/11/2025",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNPR8",
+    "paymentDate": "12/12/2025",
+    "rate": "0,19000000000",
+    "relatedTo": "3º Trimestre/2025",
+    "approvedOn": "30/10/2025",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "DIVIDENDO",
+    "lastDatePrior": "10/11/2025",
+    "remarks": ""
+   }
+  ],
+  "stockDividends": [
+   {
+    "assetIssued": "BRGOAUACNOR1",
+    "factor": "33,33000000000",
+    "approvedOn": "15/12/2025",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "18/12/2025",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNPR8",
+    "factor": "33,33000000000",
+    "approvedOn": "15/12/2025",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "BONIFICACAO",
+    "lastDatePrior": "18/12/2025",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNOR1",
+    "factor": "70,00000000000",
+    "approvedOn": "30/04/2004",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "DESDOBRAMENTO",
+    "lastDatePrior": "30/04/2004",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNPR8",
+    "factor": "70,00000000000",
+    "approvedOn": "30/04/2004",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "DESDOBRAMENTO",
+    "lastDatePrior": "30/04/2004",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNOR1",
+    "factor": "0,00100000000",
+    "approvedOn": "30/04/2003",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "GRUPAMENTO",
+    "lastDatePrior": "30/04/2003",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUACNPR8",
+    "factor": "0,00100000000",
+    "approvedOn": "30/04/2003",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "GRUPAMENTO",
+    "lastDatePrior": "30/04/2003",
+    "remarks": ""
+   }
+  ],
+  "subscriptions": [
+   {
+    "assetIssued": "BRGOAUDBM006",
+    "percentage": "0,49645676700",
+    "priceUnit": "100,00000000000",
+    "tradingPeriod": "11/07/2016 a 02/08/2016",
+    "subscriptionDate": "09/08/2016",
+    "approvedOn": "07/07/2016",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "SUBSCRICAO",
+    "lastDatePrior": "07/07/2016",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUDBM006",
+    "percentage": "0,49645676700",
+    "priceUnit": "100,00000000000",
+    "tradingPeriod": "11/07/2016 a 02/08/2016",
+    "subscriptionDate": "09/08/2016",
+    "approvedOn": "07/07/2016",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "SUBSCRICAO",
+    "lastDatePrior": "07/07/2016",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUDBS011",
+    "percentage": "0,00008820600",
+    "priceUnit": "1.000.000,00000000000",
+    "tradingPeriod": "31/12/9999 a 24/09/1999",
+    "subscriptionDate": "01/10/1999",
+    "approvedOn": "21/09/1999",
+    "isinCode": "BRGOAUACNOR1",
+    "label": "PRIORIDADE SUBS",
+    "lastDatePrior": "21/09/1999",
+    "remarks": ""
+   },
+   {
+    "assetIssued": "BRGOAUDBS011",
+    "percentage": "0,00008820600",
+    "priceUnit": "1.000.000,00000000000",
+    "tradingPeriod": "31/12/9999 a 24/09/1999",
+    "subscriptionDate": "01/10/1999",
+    "approvedOn": "21/09/1999",
+    "isinCode": "BRGOAUACNPR8",
+    "label": "PRIORIDADE SUBS",
+    "lastDatePrior": "21/09/1999",
+    "remarks": ""
+   }
+  ]
+ }
+]

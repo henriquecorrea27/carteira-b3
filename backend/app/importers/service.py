@@ -88,6 +88,13 @@ def _mark_duplicates(session: Session, rows: list[ImportRow]) -> None:
             select(Transaction).where(Transaction.source == TransactionSource.MANUAL.value)
         )
     }
+    edited_auto = list(
+        session.scalars(
+            select(Transaction).where(
+                Transaction.source == TransactionSource.AUTO.value, Transaction.user_edited.is_(True)
+            )
+        )
+    )
     for row in rows:
         if row.status != RowStatus.NEW or row.dedup_hash is None:
             continue
@@ -101,6 +108,25 @@ def _mark_duplicates(session: Session, rows: list[ImportRow]) -> None:
             if c and (c.date, c.ticker, c.type.value, c.quantity) in manual:
                 row.status = RowStatus.POSSIBLE_DUPLICATE
                 row.reason = "parecido com um lançamento manual (mesma data, ticker, tipo e quantidade)"
+            elif c and any(_same_event(auto, c) for auto in edited_auto):
+                # Automatic rows edited by the user win over the import (non-edited ones are replaced
+                # by the imported rows when apply_events runs after the commit)
+                row.status = RowStatus.DUPLICATE
+                row.reason = "já lançado automaticamente e editado por você"
+
+
+def _same_event(auto: Transaction, c: Candidate) -> bool:
+    if auto.ticker != c.ticker or auto.type != c.type.value:
+        return False
+    if c.type in (T.DIVIDEND, T.JCP, T.INCOME):
+        paid = auto.payment_date or auto.date
+        close_price = (
+            auto.price is not None
+            and c.price is not None
+            and abs(auto.price - c.price) <= max(Decimal("0.0006"), auto.price * Decimal("0.01"))
+        )
+        return close_price and paid <= c.date <= paid + timedelta(days=5)
+    return auto.date - timedelta(days=1) <= c.date <= auto.date + timedelta(days=30)
 
 
 def _merge_split_events(rows: list[ImportRow]) -> None:

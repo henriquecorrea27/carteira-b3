@@ -153,3 +153,41 @@ class RefreshOut(BaseModel):
     benchmarks_inserted: int
     errors: list[str]
     tickers_without_data: list[str]
+
+
+class AgendaItemOut(_FromAttrs):
+    ticker: str
+    kind: str
+    label: str
+    record_date: dt.date
+    ex_date: dt.date
+    payment_date: dt.date | None
+    value: Number
+    factor: Number | None
+    quantity: Number
+    estimated_net: Money | None
+    in_ledger: bool
+
+
+class PendingIssueOut(_FromAttrs):
+    id: str
+    kind: str
+    ticker: str
+    date: dt.date
+    message: str
+    transaction_id: int | None
+
+
+class ApplyOut(_FromAttrs):
+    created: int
+    updated: int
+    removed: int
+    enriched: int
+    skipped: list[str]
+
+
+class EventsSyncOut(_FromAttrs):
+    issuers: int
+    events_seen: int
+    errors: list[str]
+    applied: ApplyOut
