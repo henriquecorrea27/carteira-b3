@@ -1,0 +1,45 @@
+# Personal data — never commit
+_private/
+*.xlsx
+*.xls
+*.csv
+!backend/tests/fixtures/**/*.csv
+!backend/tests/fixtures/**/*.xlsx
+*.png
+*.jpg
+!frontend/public/**/*.png
+!frontend/src/assets/**/*.png
+*.dump
+*.sql.gz
+backups/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+logs/

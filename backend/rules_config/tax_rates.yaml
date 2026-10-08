@@ -1,0 +1,21 @@
+# Income tax withheld at source on cash distributions, by payment date.
+# Each entry is valid from `valid_from` (inclusive) until the next entry's valid_from.
+# Never hardcode these rates in the code.
+
+jcp:
+  - valid_from: 1900-01-01
+    rate: "0.15"
+  # LC 224/2025: 17.5% for JCP paid from 2026-01-01
+  - valid_from: 2026-01-01
+    rate: "0.175"
+
+# Dividends are exempt for regular investors. Since 2026 (Lei 15.270/2025) there is a 10%
+# withholding only when one company pays more than R$ 50k in a month to the same person;
+# store the withheld amount when the source reports it, never presume it.
+dividend:
+  - valid_from: 1900-01-01
+    rate: "0"
+
+income:
+  - valid_from: 1900-01-01
+    rate: "0"

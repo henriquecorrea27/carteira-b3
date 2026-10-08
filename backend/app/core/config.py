@@ -1,0 +1,25 @@
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+RULES_CONFIG_DIR = BACKEND_DIR / "rules_config"
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    database_url: str = "postgresql+psycopg://carteira:carteira@localhost:5432/carteira"
+    database_url_test: str = "postgresql+psycopg://carteira:carteira@localhost:5432/carteira_test"
+    discord_webhook_url: str = ""
+    timezone: str = "America/Sao_Paulo"
+    # Warn when a manual trade price is this far (fraction) from the day's close
+    price_deviation_warning: float = 0.15
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
