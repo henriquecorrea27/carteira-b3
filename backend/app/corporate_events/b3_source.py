@@ -150,6 +150,10 @@ class B3CorporateEventsSource:
         self._client = client or httpx.Client(timeout=30, headers={"User-Agent": "Mozilla/5.0"})
 
     def events_for_issuer(self, issuer: str) -> list[ParsedEvent]:
+        return parse_supplement(self.supplement(issuer), issuer)
+
+    def supplement(self, issuer: str) -> list[dict]:
+        """Raw company payload (also used for share counts by app.fundamentals.shares)."""
         token = base64.b64encode(
             json.dumps({"issuingCompany": issuer, "language": "pt-br"}, separators=(",", ":")).encode()
         ).decode()
@@ -165,4 +169,4 @@ class B3CorporateEventsSource:
             raise CorporateEventsError(f"resposta inesperada da B3 para {issuer}") from err
         if not isinstance(payload, list):
             raise CorporateEventsError(f"formato inesperado da B3 para {issuer}")
-        return parse_supplement(payload, issuer)
+        return payload

@@ -65,6 +65,7 @@ cd backend && uv run pytest                        # testes (usa o banco carteir
 cd backend && uv run ruff check . && uv run ruff format .
 cd backend && uv run python -m app.jobs.update_prices          # cotações, IBOV e CDI
 cd backend && uv run python -m app.jobs.sync_corporate_events  # proventos e eventos da B3
+cd backend && uv run python -m app.jobs.ingest_cvm             # dados da CVM + indicadores (mensal)
 cd backend && uv run python -m app.jobs.daily_report   # (F7) relatório diário manual
 cd frontend && npm run dev                         # UI em http://localhost:5180 (proxy /api → :8000)
 ```
@@ -237,6 +238,23 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 - TTM = soma dos últimos 4 trimestres; o 4º trimestre = DFP anual − ITR acumulado de 9 meses.
 - D&A não tem código padronizado na DFC: localizar pela descrição da conta e registrar quando não encontrar.
 - Ingestão: job mensal + botão manual. Guardar dados brutos e indicadores calculados separadamente.
+
+**Implementação (F5, `app/fundamentals/`)** — layout real documentado em `backend/tests/fixtures/cvm/README.md`:
+- Arquivos brutos da CVM ficam em cache em `backend/data/cvm/raw` (fora do git; rebaixados só quando a CVM
+  republica). Dados extraídos por período em `fundamental_periods`; indicadores calculados sob demanda.
+- Lê DFP dos últimos 6 anos (médias de 5 anos + base do CAGR) e ITR do ano atual e do anterior.
+- Contas localizadas por nível + descrição (os códigos variam entre empresas, bancos e seguradoras).
+- **Número de ações: B3** (dados da empresa listada, em unidades). A `composicao_capital` da CVM mistura
+  unidades e milhares sem indicar a escala → só serve de reserva (escala deduzida pelo LPA declarado) e para as
+  ações em tesouraria.
+- **Dividendos pagos: DFC individual (controladora)** — a consolidada inclui o que as controladas pagam aos
+  minoritários delas (ex.: holding Metalúrgica Gerdau).
+- **DY médio 5a e Bazin:** a fonte da seção 3.9 (B3) só tem ~12 meses de proventos, então os proventos por ação
+  de 5 anos = dividendos + JCP pagos (DFC da controladora) ÷ ações atuais.
+- TTM = acumulado do último ITR + último DFP − mesmo acumulado do ano anterior.
+- Setor especial: FINANCIAL (modelo de banco ou setor CVM de bancos/seguradoras/intermediação financeira,
+  inclusive holdings desses setores) e UTILITY (energia elétrica, saneamento, água e gás).
+- Ativos da carteira que são ações listadas recebem o setor da CVM e a classe STOCK (corrige units "11").
 
 ### 4.2 Definição dos indicadores
 | Indicador | Fórmula |

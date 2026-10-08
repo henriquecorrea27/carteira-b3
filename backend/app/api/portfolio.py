@@ -8,7 +8,7 @@ from app.core.db import get_session
 from app.market_data import service as market
 from app.market_data.bcb import BCBRatesProvider
 from app.market_data.yfinance_provider import YFinanceProvider
-from app.models import Asset
+from app.models import Asset, Company, CompanyTicker
 from app.portfolio import dashboard, provents
 from app.portfolio.tickers import InvalidTickerError, normalize_ticker
 from app.portfolio.types import AssetClass
@@ -104,10 +104,36 @@ def _asset_out(asset: Asset) -> AssetOut:
 
 @router.get("/assets/search", response_model=list[AssetOut])
 def search_assets(session: SessionDep, q: str = "", limit: int = 10):
-    """Autocomplete over known assets (the B3 instruments list is loaded in later phases)."""
+    """Autocomplete: assets already in the ledger first, then every listed stock from the CVM data."""
     term = f"%{q.strip().upper()}%"
-    query = select(Asset).where(or_(Asset.ticker.ilike(term), Asset.name.ilike(term))).order_by(Asset.ticker)
-    return [_asset_out(a) for a in session.scalars(query.limit(limit)).all()]
+    known = session.scalars(
+        select(Asset)
+        .where(or_(Asset.ticker.ilike(term), Asset.name.ilike(term)))
+        .order_by(Asset.ticker)
+        .limit(limit)
+    ).all()
+    out = [_asset_out(a) for a in known]
+    seen = {a.ticker for a in out}
+    listed = session.execute(
+        select(CompanyTicker.ticker, Company.name, Company.sector_cvm)
+        .join(Company, Company.cnpj == CompanyTicker.cnpj)
+        .where(or_(CompanyTicker.ticker.ilike(term), Company.name.ilike(term)))
+        .order_by(CompanyTicker.ticker)
+        .limit(limit * 2)
+    ).all()
+    for ticker, name, sector in listed:
+        if ticker not in seen and len(out) < limit:
+            seen.add(ticker)
+            out.append(
+                AssetOut(
+                    ticker=ticker,
+                    name=name,
+                    asset_class=AssetClass.STOCK,
+                    class_confirmed=True,
+                    sector=sector,
+                )
+            )
+    return out
 
 
 @router.patch("/assets/{ticker}", response_model=AssetOut)

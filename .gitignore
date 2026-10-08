@@ -46,3 +46,6 @@ logs/
 
 # Browser automation artifacts (may contain personal data)
 .playwright-mcp/
+
+# Downloaded public datasets (CVM) — cache, not versioned
+backend/data/

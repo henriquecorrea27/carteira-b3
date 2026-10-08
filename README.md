@@ -14,7 +14,8 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
 | F2 — Preços, CDI, painel completo | ✅ |
 | F3 — Proventos e eventos automáticos | ✅ |
 | F4 — Importador B3 | ✅ backend + tela de importação |
-| F5–F8 | ⏳ |
+| F5 — Dados da CVM, ticker ↔ CNPJ, setores, indicadores | ✅ |
+| F6–F8 | ⏳ |
 
 ## Requisitos
 
@@ -50,6 +51,7 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
    ```
    cd backend && uv run python -m app.jobs.update_prices
    cd backend && uv run python -m app.jobs.sync_corporate_events   # proventos e eventos da B3
+   cd backend && uv run python -m app.jobs.ingest_cvm              # dados da CVM (~1 min; mensal)
    ```
    Abrir http://localhost:5180.
 
@@ -77,6 +79,8 @@ cd frontend && npm run test
 | GET | `/api/portfolio/pending` | Pendências (bonificação sem custo, evento não reconhecido) |
 | POST | `/api/market-data/refresh`, `/api/corporate-events/sync` | Atualizar cotações / eventos da B3 |
 | POST | `/api/import/b3/preview`, `/api/import/b3/commit` | Importar extratos da B3 |
+| GET | `/api/fundamentals/{ticker}` | Indicadores fundamentalistas de qualquer ação listada |
+| POST | `/api/fundamentals/ingest` | Baixar/processar os dados da CVM (em segundo plano) |
 
 Valores monetários e quantidades trafegam como **string decimal** (nunca float).
 
