@@ -43,3 +43,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Browser automation artifacts (may contain personal data)
+.playwright-mcp/

@@ -60,17 +60,18 @@ CLAUDE.md
 # PostgreSQL 16 roda como serviço do Windows (postgresql-x64-16); bancos: carteira e carteira_test
 cd backend && uv sync                              # instala dependências
 cd backend && uv run alembic upgrade head          # aplica migrações
-cd backend && uv run uvicorn app.main:app --reload # API em http://localhost:8000 (docs em /docs)
+cd backend && uv run python -m uvicorn app.main:app --reload # API em http://localhost:8000 (docs em /docs)
 cd backend && uv run pytest                        # testes (usa o banco carteira_test)
 cd backend && uv run ruff check . && uv run ruff format .
 cd backend && uv run python -m app.jobs.daily_report   # (F7) relatório diário manual
-cd frontend && npm run dev                         # UI em http://localhost:5173 (proxy /api → :8000)
+cd frontend && npm run dev                         # UI em http://localhost:5180 (proxy /api → :8000)
 ```
 
 ### Ambiente (Windows)
 - **Smart App Control está ativo** e bloqueia DLLs sem reputação (ex.: pandas ≥ 2.3 falhou com
   "Uma política de Controle de Aplicativo bloqueou este arquivo"). Ao adicionar/atualizar dependência com
   binário nativo, testar o import; se bloquear, fixar uma versão anterior e anotar o motivo no `pyproject.toml`.
+  Ele também bloqueia os `.exe` gerados no venv (ex.: `uvicorn.exe`): rodar sempre como `python -m <ferramenta>`.
 - `uv` instalado via winget; se não estiver no PATH do shell, o executável fica em
   `%LOCALAPPDATA%\Microsoft\WinGet\Packages\astral-sh.uv_*\uv.exe`.
 - Segredos do banco em `backend/.env` (gerados na instalação; modelo em `backend/.env.example`).

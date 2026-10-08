@@ -135,7 +135,6 @@ class B3MovementsImporter:
             candidate.price = unit_price
             candidate.payment_date = on_date
             candidate.status = ProventStatus.CONFIRMED
-            candidate.notes = "data-com não informada no extrato da B3 (usada a data de pagamento)"
             candidate.gross_amount, candidate.tax_withheld = _gross_and_tax(tx_type, on_date, amount)
         elif tx_type == T.FRACTION_AUCTION:
             if amount is None or not quantity:

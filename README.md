@@ -10,10 +10,10 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
 | Fase | Situação |
 |---|---|
 | F0 — Setup (repo, PostgreSQL, FastAPI + Alembic, frontend) | ✅ |
-| F1 — Motor de carteira, lançamentos manuais (individual e lote), testes numéricos | ✅ backend · 🚧 UI |
-| F2 — Preços, CDI, painel completo | ⏳ |
+| F1 — Motor de carteira, lançamentos manuais (individual e lote), testes numéricos | ✅ |
+| F2 — Preços, CDI, painel completo | ✅ |
 | F3 — Proventos e eventos automáticos | ⏳ |
-| F4 — Importador B3 | ⏳ (layout já documentado) |
+| F4 — Importador B3 | ✅ backend + tela de importação |
 | F5–F8 | ⏳ |
 
 ## Requisitos
@@ -36,7 +36,7 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
    cd backend
    uv sync
    uv run alembic upgrade head
-   uv run uvicorn app.main:app --reload
+   uv run python -m uvicorn app.main:app --reload
    ```
 4. Frontend:
    ```
@@ -44,7 +44,13 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
    npm install
    npm run dev
    ```
-   Abrir http://localhost:5173.
+   O frontend chama o backend real. Para ver dados de demonstração, criar `frontend/.env.local` com
+   `VITE_USE_MOCKS=true`.
+5. Atualizar cotações, IBOV e CDI (também pelo botão "Atualizar preços"):
+   ```
+   cd backend && uv run python -m app.jobs.update_prices
+   ```
+   Abrir http://localhost:5180.
 
 ## Testes
 

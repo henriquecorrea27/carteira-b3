@@ -1,0 +1,211 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/instrument-sans/wdth.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Design tokens.
+ * Principle: the interface chrome is monochrome ink on a cool neutral paper;
+ * color is reserved for meaning — data series, gain/loss and the rule decisions.
+ */
+:root {
+  color-scheme: light;
+  --paper: #f3f4f2;
+  --surface: #ffffff;
+  --surface-2: #f8f9f7;
+  --sunken: #eceeeb;
+  --ink: #15181a;
+  --ink-2: #4f565a;
+  --muted: #80878b;
+  --line: #e1e4e0;
+  --line-strong: #c9cdc8;
+  --focus: #15181a;
+
+  --up: #0b7a3b;
+  --up-soft: #e3f3e9;
+  --down: #c0392b;
+  --down-soft: #fbe8e5;
+  --warn: #9a6400;
+  --warn-soft: #fbf0d9;
+  --info: #255f9e;
+  --info-soft: #e5eef8;
+
+  /* Chart chrome */
+  --grid: #e7e9e5;
+  --axis: #c9cdc8;
+
+  /* Categorical series — fixed order, validated (dataviz reference palette) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --series-other: #b9bdb8;
+  --series-neutral: #9aa09c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --paper: #0f1112;
+    --surface: #171a1c;
+    --surface-2: #1c2022;
+    --sunken: #121416;
+    --ink: #eef0ee;
+    --ink-2: #a8afb2;
+    --muted: #7a8286;
+    --line: #262a2d;
+    --line-strong: #353a3d;
+    --focus: #eef0ee;
+
+    --up: #3ccb7f;
+    --up-soft: #12281c;
+    --down: #f0716a;
+    --down-soft: #2e1716;
+    --warn: #f0b84a;
+    --warn-soft: #2b2212;
+    --info: #78aef0;
+    --info-soft: #14212f;
+
+    --grid: #23272a;
+    --axis: #383d40;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --series-other: #4a5054;
+    --series-neutral: #6b7276;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0f1112;
+  --surface: #171a1c;
+  --surface-2: #1c2022;
+  --sunken: #121416;
+  --ink: #eef0ee;
+  --ink-2: #a8afb2;
+  --muted: #7a8286;
+  --line: #262a2d;
+  --line-strong: #353a3d;
+  --focus: #eef0ee;
+
+  --up: #3ccb7f;
+  --up-soft: #12281c;
+  --down: #f0716a;
+  --down-soft: #2e1716;
+  --warn: #f0b84a;
+  --warn-soft: #2b2212;
+  --info: #78aef0;
+  --info-soft: #14212f;
+
+  --grid: #23272a;
+  --axis: #383d40;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --series-other: #4a5054;
+  --series-neutral: #6b7276;
+}
+
+@theme inline {
+  --font-sans: "Instrument Sans Variable", system-ui, "Segoe UI", sans-serif;
+
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  /* Type scale (1.2 minor third around a 14px UI base) */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.05rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.2rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.35rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.3125rem;
+  --text-xl--line-height: 1.75rem;
+  --text-hero: 3.25rem;
+  --text-hero--line-height: 1;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+  html {
+    background: var(--paper);
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    font-feature-settings: "ss01" on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--series-1) 25%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Columns of figures align; standalone big numbers stay proportional. */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .condensed {
+    font-stretch: 88%;
+  }
+}
