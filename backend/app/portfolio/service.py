@@ -47,7 +47,7 @@ def ensure_asset(session: Session, ticker: str) -> Asset:
     return asset
 
 
-def _fill_row(row: Transaction, payload: TransactionIn) -> Transaction:
+def fill_row(row: Transaction, payload: TransactionIn) -> Transaction:
     row.date = payload.date
     row.ticker = payload.ticker
     row.type = payload.type.value
@@ -107,7 +107,7 @@ def create_transactions(
     session: Session, payloads: Sequence[TransactionIn], source: TransactionSource = TransactionSource.MANUAL
 ) -> list[Transaction]:
     """All-or-nothing insert: if any row breaks the ledger, nothing is saved."""
-    new_rows = [_fill_row(Transaction(source=source.value, user_edited=False), p) for p in payloads]
+    new_rows = [fill_row(Transaction(source=source.value, user_edited=False), p) for p in payloads]
     existing = [row.to_entry() for row in _all_rows(session)]
     _replay(existing + [_pending_entry(row, i) for i, row in enumerate(new_rows)])
 
@@ -125,11 +125,11 @@ def update_transaction(session: Session, transaction_id: int, payload: Transacti
     if row is None:
         raise TransactionNotFoundError(transaction_id)
     others = [r.to_entry() for r in _all_rows(session) if r.id != transaction_id]
-    candidate = _fill_row(Transaction(source=row.source), payload)
+    candidate = fill_row(Transaction(source=row.source), payload)
     candidate_entry = replace(candidate.to_entry(), id=transaction_id, seq=transaction_id)
     _replay([*others, candidate_entry])
 
-    _fill_row(row, payload)
+    fill_row(row, payload)
     row.user_edited = True
     ensure_asset(session, row.ticker)
     if row.target_ticker:

@@ -8,6 +8,8 @@ Geradas por `make_b3_fixtures.py`. Reproduzem **exatamente o layout** dos extrat
 Comum aos dois arquivos: `.xlsx`, uma única aba, linha 1 = cabeçalho, ordem **mais recente primeiro**.
 Datas são **texto** `dd/mm/aaaa` (formato de célula `dd/MM/yyyy`). Números são células numéricas `int`/`float`
 (formato `R$`); campo vazio = texto `"-"`.
+O XML da planilha declara `<dimension ref="A1"/>` mesmo com centenas de linhas: no modo `read_only` do
+openpyxl é preciso chamar `reset_dimensions()`, senão só a primeira célula é lida.
 
 ### Negociação (aba `Negociação`)
 `Data do Negócio | Tipo de Movimentação | Mercado | Prazo/Vencimento | Instituição | Código de Negociação | Quantidade | Preço | Valor`

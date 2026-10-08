@@ -5,6 +5,8 @@ All tickers/values describe a fictitious portfolio — never put real user data 
 Run: uv run python tests/fixtures/b3/make_b3_fixtures.py
 """
 
+import re
+import zipfile
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -76,7 +78,16 @@ MOVEMENT = [
     ("Credito", "13/08/2025", "Dividendo - Transferido", TAEE, XP_DOT, 20, 0.5, 10),
     ("Credito", "13/08/2025", "Atualização", BBAS, INTER, 10, "-", "-"),
     ("Credito", "14/07/2025", "Transferência - Liquidação", WEGE, XP, 100, 52.3, 5230),
-    ("Debito", "11/07/2025", "RESGATE ANTECIPADO/", "CDB - CDBB2473QRY - BANCO INTER S/A", BANK, 1000, 0.01067034, 10.67),
+    (
+        "Debito",
+        "11/07/2025",
+        "RESGATE ANTECIPADO/",
+        "CDB - CDBB2473QRY - BANCO INTER S/A",
+        BANK,
+        1000,
+        0.01067034,
+        10.67,
+    ),
     ("Credito", "11/09/2025", "Compra", "Futuro - WDOV25", TORO, 0, 5424, "-"),
     ("Debito", "11/09/2025", "Venda", "Futuro - WDOV25", TORO, 0, 5418, "-"),
     ("Credito", "08/09/2025", "Compra", "Futuro - WINV25", TORO, 0, 143610, "-"),
@@ -89,9 +100,27 @@ MOVEMENT = [
     ("Credito", "28/05/2024", "Grupamento", MGLU, INTER, 12, "-", "-"),
     ("Credito", "17/04/2024", "Desdobro", BBAS, INTER, 5, "-", "-"),
     ("Credito", "22/03/2024", "Transferência - Liquidação", BBAS, INTER, 5, 55.7, 278.5),
-    ("Debito", "01/03/2024", "Direitos de Subscrição - Não Exercido", "MGLU1 - MAGAZINE LUIZA S/A", INTER, 0, "-", "-"),
+    (
+        "Debito",
+        "01/03/2024",
+        "Direitos de Subscrição - Não Exercido",
+        "MGLU1 - MAGAZINE LUIZA S/A",
+        INTER,
+        0,
+        "-",
+        "-",
+    ),
     ("Credito", "29/02/2024", "Cessão de Direitos", "MGLU1 - MAGAZINE LUIZA S/A", INTER, 11, "-", "-"),
-    ("Debito", "29/02/2024", "Cessão de Direitos - Solicitada", "MGLU1 - MAGAZINE LUIZA S/A", INTER, 11, "-", "-"),
+    (
+        "Debito",
+        "29/02/2024",
+        "Cessão de Direitos - Solicitada",
+        "MGLU1 - MAGAZINE LUIZA S/A",
+        INTER,
+        11,
+        "-",
+        "-",
+    ),
     ("Credito", "02/02/2024", "Direito de Subscrição", "MGLU1 - MAGAZINE LUIZA S/A", INTER, 11, "-", "-"),
     ("Credito", "10/01/2024", "Atualização", MGLU, INTER, 120, "-", "-"),
     ("Credito", "20/12/2023", "Juros Sobre Capital Próprio", ITSA, INTER, 50, 0.2, 8.5),
@@ -101,7 +130,9 @@ MOVEMENT = [
 ]
 
 
-def _write(path: Path, sheet: str, header: list[str], rows: list[tuple], date_cols: set[int], money_cols: set[int]):
+def _write(
+    path: Path, sheet: str, header: list[str], rows: list[tuple], date_cols: set[int], money_cols: set[int]
+):
     wb = Workbook()
     ws = wb.active
     ws.title = sheet
@@ -114,6 +145,18 @@ def _write(path: Path, sheet: str, header: list[str], rows: list[tuple], date_co
         for c in money_cols:
             ws.cell(r, c).number_format = MONEY_FMT
     wb.save(path)
+    _fake_b3_dimension(path)
+
+
+def _fake_b3_dimension(path: Path) -> None:
+    """Real B3 files declare <dimension ref="A1"/> regardless of size; reproduce that quirk."""
+    with zipfile.ZipFile(path) as src:
+        items = [(info, src.read(info.filename)) for info in src.infolist()]
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as dst:
+        for info, data in items:
+            if info.filename.startswith("xl/worksheets/"):
+                data = re.sub(rb'<dimension ref="[^"]*"/>', b'<dimension ref="A1"/>', data)
+            dst.writestr(info, data)
 
 
 def main() -> None:

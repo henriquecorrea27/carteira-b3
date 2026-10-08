@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import portfolio, transactions
+from app.api import imports, portfolio, transactions
 from app.core.db import engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -42,3 +42,4 @@ def health() -> dict:
 
 app.include_router(transactions.router, prefix="/api")
 app.include_router(portfolio.router, prefix="/api")
+app.include_router(imports.router, prefix="/api")
