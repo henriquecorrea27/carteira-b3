@@ -20,6 +20,9 @@ class PriceHistory(TimestampMixin, Base):
     close: Mapped[Decimal]
     close_adjusted: Mapped[Decimal]
     volume: Mapped[Decimal | None]
+    open: Mapped[Decimal | None]
+    high: Mapped[Decimal | None]
+    low: Mapped[Decimal | None]
     source: Mapped[str] = mapped_column(String(20))
 
 

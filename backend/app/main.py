@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import corporate_events, fundamentals, imports, portfolio, transactions
+from app.api import analysis, corporate_events, fundamentals, imports, portfolio, transactions
 from app.core.db import engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -45,3 +45,4 @@ app.include_router(portfolio.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(corporate_events.router, prefix="/api")
 app.include_router(fundamentals.router, prefix="/api")
+app.include_router(analysis.router, prefix="/api")

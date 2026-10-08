@@ -178,9 +178,9 @@ def _enrich_assets(session: Session) -> None:
     """Portfolio assets that are listed stocks get the CVM sector, name and the STOCK class (fixes the
     ambiguous '11' suffix of units); a class the user set by hand is kept."""
     rows = session.execute(
-        select(Asset, Company).join(CompanyTicker, CompanyTicker.ticker == Asset.ticker).join(
-            Company, Company.cnpj == CompanyTicker.cnpj
-        )
+        select(Asset, Company)
+        .join(CompanyTicker, CompanyTicker.ticker == Asset.ticker)
+        .join(Company, Company.cnpj == CompanyTicker.cnpj)
     ).all()
     for asset, company in rows:
         asset.sector = company.sector_cvm
@@ -251,6 +251,7 @@ class TickerFundamentals:
     price_date: date | None
     shares: ShareCount | None
     result: FundamentalsResult
+    previous_close: Decimal | None = None
 
 
 def _refresh_shares(session: Session, company: Company, issuer: str, source, today: date) -> None:
@@ -271,6 +272,39 @@ def _refresh_shares(session: Session, company: Company, issuer: str, source, tod
         session.commit()
 
 
+def fetch_range(
+    session: Session,
+    provider: MarketDataProvider,
+    ticker: str,
+    start: date,
+    end: date,
+    fill_ohlc: bool = False,
+) -> None:
+    """Fetch and cache daily bars of one ticker (raises MarketDataError on provider failure).
+    `fill_ohlc` also completes open/high/low of rows cached before they were stored."""
+    for bar in provider.daily_bars([ticker], start, end).get(ticker, []):
+        stmt = insert(PriceHistory).values(
+            ticker=ticker,
+            date=bar.date,
+            close=bar.close,
+            close_adjusted=bar.close_adjusted,
+            volume=bar.volume,
+            open=bar.open,
+            high=bar.high,
+            low=bar.low,
+            source=provider.name,
+        )
+        if fill_ohlc:
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["ticker", "date"],
+                set_={"open": stmt.excluded.open, "high": stmt.excluded.high, "low": stmt.excluded.low},
+            )
+        else:
+            stmt = stmt.on_conflict_do_nothing(index_elements=["ticker", "date"])
+        session.execute(stmt)
+    session.commit()
+
+
 def ensure_recent_prices(
     session: Session, provider: MarketDataProvider | None, tickers: list[str], today: date
 ) -> list[str]:
@@ -282,21 +316,9 @@ def ensure_recent_prices(
         if provider is None or start > today or (last and (today - last).days < 1):
             continue
         try:
-            bars = provider.daily_bars([ticker], start, today).get(ticker, [])
+            fetch_range(session, provider, ticker, start, today)
         except MarketDataError as err:
             errors.append(str(err))
-            continue
-        for bar in bars:
-            stmt = insert(PriceHistory).values(
-                ticker=ticker,
-                date=bar.date,
-                close=bar.close,
-                close_adjusted=bar.close_adjusted,
-                volume=bar.volume,
-                source=provider.name,
-            )
-            session.execute(stmt.on_conflict_do_nothing(index_elements=["ticker", "date"]))
-    session.commit()
     return errors
 
 
@@ -347,6 +369,16 @@ def fundamentals_for(
     ensure_recent_prices(session, market, wanted, today)
 
     price, price_date = _latest_close(session, ticker)
+    previous_close = (
+        session.scalar(
+            select(PriceHistory.close)
+            .where(PriceHistory.ticker == ticker, PriceHistory.date < price_date)
+            .order_by(PriceHistory.date.desc())
+            .limit(1)
+        )
+        if price_date
+        else None
+    )
     class_prices = {}
     for share_class in ("ON", "PN"):
         if share_class in by_class:
@@ -358,6 +390,7 @@ def fundamentals_for(
     if link.share_class == "UNIT" and shares:
         # Unit price → per-share figures need the unit composition (e.g. "1 ON / 2 PN")
         price = _unit_to_share_price(price, link.unit_composition)
+        previous_close = _unit_to_share_price(previous_close, link.unit_composition)
     result = compute(
         periods,
         shares,
@@ -379,6 +412,7 @@ def fundamentals_for(
         price_date=price_date,
         shares=shares,
         result=result,
+        previous_close=previous_close,
     )
 
 

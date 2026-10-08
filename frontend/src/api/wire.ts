@@ -28,6 +28,17 @@ export interface Position {
   open_result_pct: Dec | null;
   weight_pct: Dec | null;
   yield_on_cost_pct: Dec | null;
+  rules: RulesSummary | null;
+}
+
+export interface RulesSummary {
+  decision: "BUY" | "WAIT" | "AVOID";
+  score_final: number | null;
+  score_quality: number | null;
+  score_price: number | null;
+  inconclusive: boolean;
+  main_reason: string | null;
+  date: string;
 }
 
 export interface Summary {
@@ -186,5 +197,61 @@ export interface AgendaItem {
 export interface EventsSync {
   issuers: number;
   events_seen: number;
+  errors: string[];
+}
+
+export interface Analysis {
+  ticker: string;
+  name: string;
+  cnpj: string;
+  sector: string | null;
+  special_sector: "FINANCIAL" | "UTILITY" | null;
+  price: Dec | null;
+  price_date: string | null;
+  day_change: Dec | null;
+  decision: "BUY" | "WAIT" | "AVOID";
+  score_final: number | null;
+  score_quality: number | null;
+  score_price: number | null;
+  quality_inconclusive: boolean;
+  price_inconclusive: boolean;
+  main_reason: string | null;
+  eliminatory: { id: string; label: string; rule: string; value_label: string | null; passed: boolean | null }[];
+  indicators: {
+    key: string;
+    label: string;
+    group: "QUALITY" | "PRICE";
+    value: Dec | null;
+    unit: "pct" | "x" | "brl" | "count";
+    range_label: string;
+    weight: number;
+    points: number | null;
+    status: "GOOD" | "MID" | "BAD" | "NA";
+    note: string | null;
+  }[];
+  graham_price: Dec | null;
+  graham_margin: Dec | null;
+  bazin_price: Dec | null;
+  dy_5y: Dec | null;
+  market_cap: Dec | null;
+  last_dfp: string | null;
+  last_itr: string | null;
+  received_on: string | null;
+  warnings: string[];
+  rules_version: number;
+}
+
+export interface PriceBar {
+  date: string;
+  open: Dec | null;
+  high: Dec | null;
+  low: Dec | null;
+  close: Dec;
+  volume: Dec | null;
+}
+
+export interface PortfolioRun {
+  analyzed: string[];
+  skipped: string[];
   errors: string[];
 }

@@ -83,6 +83,9 @@ def refresh_prices(session: Session, provider: MarketDataProvider, today: date) 
                 close=bar.close,
                 close_adjusted=bar.close_adjusted,
                 volume=bar.volume,
+                open=bar.open,
+                high=bar.high,
+                low=bar.low,
                 source=provider.name,
             )
             session.execute(
@@ -92,6 +95,9 @@ def refresh_prices(session: Session, provider: MarketDataProvider, today: date) 
                         "close": stmt.excluded.close,
                         "close_adjusted": stmt.excluded.close_adjusted,
                         "volume": stmt.excluded.volume,
+                        "open": stmt.excluded.open,
+                        "high": stmt.excluded.high,
+                        "low": stmt.excluded.low,
                         "source": stmt.excluded.source,
                     },
                 )

@@ -15,7 +15,9 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
 | F3 — Proventos e eventos automáticos | ✅ |
 | F4 — Importador B3 | ✅ backend + tela de importação |
 | F5 — Dados da CVM, ticker ↔ CNPJ, setores, indicadores | ✅ |
-| F6–F8 | ⏳ |
+| F6 — Motor de regras, tela de Análise, decisão na carteira, histórico | ✅ |
+| F7 — Relatório diário no Discord | ⏳ |
+| F8 — Análise gráfica | ⏳ |
 
 ## Requisitos
 
@@ -52,6 +54,7 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
    cd backend && uv run python -m app.jobs.update_prices
    cd backend && uv run python -m app.jobs.sync_corporate_events   # proventos e eventos da B3
    cd backend && uv run python -m app.jobs.ingest_cvm              # dados da CVM (~1 min; mensal)
+   cd backend && uv run python -m app.jobs.daily_analysis          # regras para as ações da carteira
    ```
    Abrir http://localhost:5180.
 
@@ -81,6 +84,9 @@ cd frontend && npm run test
 | POST | `/api/import/b3/preview`, `/api/import/b3/commit` | Importar extratos da B3 |
 | GET | `/api/fundamentals/{ticker}` | Indicadores fundamentalistas de qualquer ação listada |
 | POST | `/api/fundamentals/ingest` | Baixar/processar os dados da CVM (em segundo plano) |
+| GET | `/api/analysis/{ticker}` | Decisão por regras com explicação completa (grava o snapshot do dia) |
+| POST | `/api/analysis/portfolio` | Reanalisar todas as ações da carteira |
+| GET | `/api/prices/{ticker}` | Cotações diárias (OHLC) para o gráfico |
 
 Valores monetários e quantidades trafegam como **string decimal** (nunca float).
 

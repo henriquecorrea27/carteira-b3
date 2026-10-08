@@ -103,6 +103,7 @@ class PositionView:
     open_result_pct: Decimal | None
     weight_pct: Decimal | None
     yield_on_cost_pct: Decimal | None
+    rules: dict | None = None  # latest analysis snapshot (stocks only)
 
 
 def positions(ctx: DashboardContext, include_closed: bool = False) -> list[PositionView]:
@@ -143,11 +144,31 @@ def positions(ctx: DashboardContext, include_closed: bool = False) -> list[Posit
                 else None,
             )
         )
+    snapshots = _latest_rules(ctx.session, [v.ticker for v in views])
+    for v in views:
+        v.rules = snapshots.get(v.ticker)
     total_value = sum((v.market_value or v.total_cost for v in views if v.quantity > 0), ZERO)
     for v in views:
         if v.quantity > 0 and total_value:
             v.weight_pct = (v.market_value or v.total_cost) / total_value
     return sorted(views, key=lambda v: v.market_value or v.total_cost, reverse=True)
+
+
+def _latest_rules(session: Session, tickers: list[str]) -> dict[str, dict]:
+    from app.rules.service import latest_snapshots  # local import: rules depends on portfolio modules
+
+    return {
+        t: {
+            "decision": s.decision,
+            "score_final": float(s.score_final) if s.score_final is not None else None,
+            "score_quality": float(s.score_quality) if s.score_quality is not None else None,
+            "score_price": float(s.score_price) if s.score_price is not None else None,
+            "inconclusive": s.inconclusive,
+            "main_reason": s.main_reason,
+            "date": s.date,
+        }
+        for t, s in latest_snapshots(session, tickers).items()
+    }
 
 
 @dataclass

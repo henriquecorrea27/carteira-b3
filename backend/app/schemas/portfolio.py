@@ -3,6 +3,7 @@ import datetime as dt
 from pydantic import BaseModel, ConfigDict
 
 from app.portfolio.types import AssetClass
+from app.schemas.analysis import RulesSummaryOut
 from app.schemas.common import Money, Number
 
 # Percentages travel as fractions ("0.1234" = 12,34%)
@@ -35,6 +36,7 @@ class PositionOut(_FromAttrs):
     open_result_pct: Number | None
     weight_pct: Number | None
     yield_on_cost_pct: Number | None
+    rules: RulesSummaryOut | None = None
 
 
 class PortfolioSummaryOut(_FromAttrs):

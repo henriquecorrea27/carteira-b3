@@ -66,6 +66,7 @@ cd backend && uv run ruff check . && uv run ruff format .
 cd backend && uv run python -m app.jobs.update_prices          # cotações, IBOV e CDI
 cd backend && uv run python -m app.jobs.sync_corporate_events  # proventos e eventos da B3
 cd backend && uv run python -m app.jobs.ingest_cvm             # dados da CVM + indicadores (mensal)
+cd backend && uv run python -m app.jobs.daily_analysis         # regras para as ações da carteira (diário)
 cd backend && uv run python -m app.jobs.daily_report   # (F7) relatório diário manual
 cd frontend && npm run dev                         # UI em http://localhost:5180 (proxy /api → :8000)
 ```
@@ -352,6 +353,19 @@ Para cada ativo pesquisado:
 **Explicabilidade é requisito:** nenhuma decisão sem mostrar o porquê.
 
 Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar mudanças (usado pelas notificações).
+
+### 5.8 Implementação (F6, `app/rules/`)
+- `engine.py` é puro e não tem nenhum número próprio: tudo vem de `rules_config/stocks.yaml` (pesos, faixas,
+  limites, tabela de decisão, setores especiais). Um teste trava os pesos iguais enquanto estiverem em avaliação.
+- Payout usa faixa "trapézio" (`band: [0, 0,25, 0,80, 1,0]`): 0 fora de 0–100%, ótimo entre 25–80%, linear entre.
+- Eliminatório sem dados (N/A) **não elimina** (aparece ➖); exceção: E3 com EBITDA negativo conta como reprovado.
+  Com menos de 5 DFPs (mín. 3), o E1 tolera o mesmo número de anos com prejuízo (1).
+- Motivo principal: eliminatório reprovado; senão, para COMPRAR o indicador que mais pontuou e para os demais o que
+  mais perdeu pontos (mostrado na carteira, na Análise e usado no Discord).
+- Snapshot diário por ticker (`analysis_snapshots`, 1 linha por ticker/dia, com a análise completa em JSON);
+  `decision_changes(dia)` compara com o snapshot anterior. Gerado ao abrir a Análise, pelo botão "Atualizar preços"
+  (cotações → eventos → reanálise da carteira) e pelo job `app.jobs.daily_analysis`.
+- FIIs, ETFs e BDRs não são analisados (não estão no FCA da CVM).
 
 ---
 

@@ -10,6 +10,9 @@ class DailyBar:
     close: Decimal  # raw close (as traded that day)
     close_adjusted: Decimal  # provider's split-adjusted close
     volume: Decimal | None
+    open: Decimal | None = None  # raw, same basis as `close`
+    high: Decimal | None = None
+    low: Decimal | None = None
 
 
 class MarketDataError(Exception):

@@ -61,7 +61,16 @@ function toPosition(p: W.Position): Position {
     dividends_received: p.provents_net,
     yield_on_cost_pct: toPct(p.yield_on_cost_pct),
     pending_cost: p.pending_bonus_cost,
-    rules: null, // rules engine arrives in F6
+    rules: p.rules
+      ? {
+          decision: p.rules.decision,
+          score_final: p.rules.score_final ?? 0,
+          score_quality: p.rules.score_quality ?? 0,
+          score_price: p.rules.score_price ?? 0,
+          inconclusive: p.rules.inconclusive,
+          main_reason: p.rules.main_reason,
+        }
+      : null,
   };
 }
 
@@ -252,8 +261,62 @@ async function commitImport(previewId: string): Promise<ImportResult> {
   };
 }
 
-const notYet = (what: string) => () =>
-  Promise.reject(new ApiError(501, `${what} ainda não está disponível nesta versão (chega na fase F6).`));
+function fundamentalsRef(a: W.Analysis): string | null {
+  const fmt = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+  const parts = [a.last_dfp && `DFP ${fmt(a.last_dfp)}`, a.last_itr && `ITR ${fmt(a.last_itr)}`].filter(Boolean);
+  return parts.length ? parts.join(" + ") : null;
+}
+
+function toAnalysis(a: W.Analysis): AssetAnalysis {
+  return {
+    ticker: a.ticker,
+    name: a.name,
+    sector: a.sector,
+    special_sector: a.special_sector,
+    asset_class: "STOCK",
+    price: a.price,
+    price_date: a.price_date,
+    day_change_pct: toPct(a.day_change),
+    fundamentals_ref: fundamentalsRef(a),
+    fundamentals_date: a.last_itr ?? a.last_dfp,
+    decision: a.decision,
+    score_final: a.score_final,
+    score_quality: a.score_quality,
+    score_price: a.score_price,
+    quality_inconclusive: a.quality_inconclusive,
+    price_inconclusive: a.price_inconclusive,
+    eliminatory: a.eliminatory,
+    indicators: a.indicators.map((i) => ({
+      key: i.key,
+      label: i.label,
+      group: i.group,
+      value: i.unit === "pct" ? toPct(i.value) : i.value,
+      unit: i.unit === "count" ? "ratio" : i.unit,
+      range_label: i.range_label,
+      points: i.points === null ? null : String(i.points),
+      max_points: String(i.weight),
+      status: i.status,
+      note: i.note,
+    })),
+    graham_fair_price: a.graham_price,
+    graham_margin_pct: toPct(a.graham_margin),
+    bazin_ceiling: a.bazin_price,
+    dy_5y_pct: toPct(a.dy_5y),
+    warnings: a.warnings
+      .filter((w) => !w.startsWith("análise parcial"))
+      .map((w) => ({ source: "Análise", message: w, last_success_at: null })),
+  };
+}
+
+async function getAnalysis(ticker: string): Promise<AssetAnalysis> {
+  try {
+    return toAnalysis(await http.get<W.Analysis>(`/analysis/${encodeURIComponent(ticker)}`));
+  } catch (err) {
+    // The page shows a friendly empty state for unknown tickers
+    if (err instanceof ApiError && err.status === 404) throw new ApiError(404, err.message);
+    throw err;
+  }
+}
 
 export const api = {
   // Portfolio
@@ -325,16 +388,33 @@ export const api = {
           .get<W.Asset[]>("/assets/search", { q })
           .then((as) => as.map((a) => ({ ticker: a.ticker, name: a.name ?? a.ticker, asset_class: a.asset_class }))),
   getAnalysis: (ticker: string): Promise<AssetAnalysis> =>
-    USE_MOCKS ? mock((s) => s.analysis(ticker)) : notYet("A análise de ativos")(),
+    USE_MOCKS ? mock((s) => s.analysis(ticker)) : getAnalysis(ticker),
   getPriceBars: (ticker: string): Promise<PriceBar[]> =>
-    USE_MOCKS ? mock((s) => s.priceBars(ticker)) : notYet("O gráfico de preços")(),
+    USE_MOCKS
+      ? mock((s) => s.priceBars(ticker))
+      : http.get<W.PriceBar[]>(`/prices/${encodeURIComponent(ticker)}`).then((bars) =>
+          bars.map((b) => ({
+            time: b.date,
+            open: b.open ?? b.close,
+            high: b.high ?? b.close,
+            low: b.low ?? b.close,
+            close: b.close,
+            volume: b.volume ?? "0",
+          })),
+        ),
   refreshPrices: (): Promise<{ updated: number; failed: number }> =>
     USE_MOCKS
       ? mock((s) => s.refreshPrices())
       : Promise.all([
           http.post<W.Refresh>("/market-data/refresh"),
           http.post<W.EventsSync>("/corporate-events/sync"),
-        ]).then(([r, e]) => ({ updated: r.prices_inserted, failed: r.errors.length + e.errors.length })),
+        ])
+          // Decisions use the fresh quotes, so the portfolio is re-analyzed afterwards
+          .then(([r, e]) =>
+            http
+              .post<W.PortfolioRun>("/analysis/portfolio")
+              .then((run) => ({ updated: r.prices_inserted, failed: r.errors.length + e.errors.length + run.errors.length })),
+          ),
 
   // Import
   previewImport: (file: File): Promise<ImportPreview> =>

@@ -1,0 +1,67 @@
+# Rules for stocks — SOURCE OF TRUTH (CLAUDE.md §5).
+# ⚠️ ALL WEIGHTS ARE EQUAL while the owner evaluates them. Do not change weights, ranges or limits
+# without an explicit decision; any approved change goes here AND in CLAUDE.md §5.
+#
+# Gradual scoring: points = clamp((value − bad) / (good − bad), 0, 1) × weight (works for "lower is better"
+# when good < bad). Score = points earned / weights evaluated × 100. Indicators without data leave the
+# denominator; if more than `inconclusive_na_weight` of a score's weight is missing → inconclusive.
+
+version: 1
+
+status:
+  good: 0.70  # ✅ ≥ 70% of the indicator's points
+  mid: 0.30  # ⚠️ 30–70% · ❌ below
+
+decision:
+  quality_buy_min: 70
+  price_buy_min: 60
+  quality_watch_min: 50
+  inconclusive_na_weight: 0.30
+  final_weights:
+    quality: 0.5
+    price: 0.5
+
+eliminatory:
+  E1:
+    label: "Lucro líquido positivo nos últimos 5 anos"
+    min_profitable_years: 4
+    window_years: 5
+  E2:
+    label: "Patrimônio líquido positivo"
+  E3:
+    label: "Dívida líquida / EBITDA"
+    max: 3.5
+    max_utility: 4.5
+  E4:
+    label: "Liquidez média diária"
+    min_brl: 2000000
+
+quality:
+  - { key: roe_5y, label: "ROE médio 5a", bad: 0.08, good: 0.20, weight: 12.5 }
+  - { key: roic, label: "ROIC", bad: 0.06, good: 0.15, weight: 12.5 }
+  - { key: net_margin_5y, label: "Margem líquida média 5a", bad: 0.05, good: 0.15, weight: 12.5 }
+  - { key: cagr_earnings_5y, label: "CAGR lucro 5a", bad: 0.0, good: 0.12, weight: 12.5 }
+  # Net cash (negative ratio) is "great" by the clamp
+  - { key: net_debt_ebitda, label: "Dívida líquida / EBITDA", bad: 3.0, good: 0.5, weight: 12.5 }
+  - { key: cagr_revenue_5y, label: "CAGR receita 5a", bad: 0.0, good: 0.10, weight: 12.5 }
+  - { key: current_ratio, label: "Liquidez corrente", bad: 0.8, good: 1.5, weight: 12.5 }
+  # Band: zero at/below 0% and at/above 100%, great between 25% and 80%, linear in between
+  - { key: payout_5y, label: "Payout médio 5a", band: [0.0, 0.25, 0.80, 1.0], weight: 12.5 }
+
+price:
+  - { key: graham_margin, label: "Margem de segurança Graham", bad: -0.20, good: 0.30, weight: 20 }
+  - { key: pe, label: "P/L", bad: 25, good: 8, weight: 20 }
+  - { key: ev_ebit, label: "EV/EBIT", bad: 15, good: 6, weight: 20 }
+  - { key: dy_5y, label: "DY médio 5a", bad: 0.02, good: 0.08, weight: 20 }
+  - { key: pb, label: "P/VP", bad: 3.0, good: 1.0, weight: 20 }
+
+sectors:
+  FINANCIAL:
+    # Banks and insurers: no EBITDA, net debt, ROIC, EV/EBIT or current ratio. Reduced set, equal weights.
+    warning: "análise parcial — setor financeiro"
+    eliminatory: [E1, E2, E4]
+    quality: [roe_5y, cagr_earnings_5y, payout_5y]
+    price: [pe, pb, dy_5y]
+  UTILITY:
+    # Energy and sanitation: E3 limit 4.5 (eliminatory.E3.max_utility)
+    warning: null

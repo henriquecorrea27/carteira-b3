@@ -65,16 +65,23 @@ class YFinanceProvider:
         splits = handle.splits
         splits.index = pd.DatetimeIndex([ts.date() for ts in splits.index])
         raw = unadjust(hist["Close"], splits[splits.index > hist.index.min()])
-        return [
-            DailyBar(
-                date=day.date(),
-                close=_dec(raw[day]),
-                close_adjusted=_dec(row["Close"]),
-                volume=Decimal(int(row["Volume"])) if pd.notna(row["Volume"]) else None,
+        bars = []
+        for day, row in hist.iterrows():
+            if pd.isna(row["Close"]) or not row["Close"]:
+                continue
+            ratio = raw[day] / row["Close"]  # same split factor for open/high/low
+            bars.append(
+                DailyBar(
+                    date=day.date(),
+                    close=_dec(raw[day]),
+                    close_adjusted=_dec(row["Close"]),
+                    volume=Decimal(int(row["Volume"])) if pd.notna(row["Volume"]) else None,
+                    open=_dec(row["Open"] * ratio) if pd.notna(row["Open"]) else None,
+                    high=_dec(row["High"] * ratio) if pd.notna(row["High"]) else None,
+                    low=_dec(row["Low"] * ratio) if pd.notna(row["Low"]) else None,
+                )
             )
-            for day, row in hist.iterrows()
-            if pd.notna(row["Close"])
-        ]
+        return bars
 
     def index_closes(self, symbol: str, start: date, end: date) -> list[tuple[date, Decimal]]:
         hist = yf.Ticker(symbol).history(
