@@ -3,7 +3,7 @@ before committing, so the stored ledger is always consistent (no oversells, no o
 
 from collections.abc import Sequence
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -15,12 +15,10 @@ from app.portfolio.tax import default_tax_table
 from app.portfolio.tickers import infer_asset_class
 from app.portfolio.types import (
     PROVENT_TYPES,
-    AssetClass,
     ProventStatus,
     TransactionSource,
     TransactionType,
 )
-from app.schemas.portfolio import PortfolioSummaryOut, PositionOut
 from app.schemas.transaction import LedgerIssue, TransactionIn
 
 ZERO = Decimal(0)
@@ -171,58 +169,3 @@ def list_transactions(
 
 def current_portfolio(session: Session) -> PortfolioResult:
     return _replay([row.to_entry() for row in _all_rows(session)])
-
-
-def get_positions(session: Session, include_closed: bool = False) -> list[PositionOut]:
-    result = current_portfolio(session)
-    assets = {a.ticker: a for a in session.scalars(select(Asset)).all()}
-    out = []
-    for pos in result.positions.values():
-        if not include_closed and not pos.is_open:
-            continue
-        asset = assets.get(pos.ticker)
-        out.append(
-            PositionOut(
-                ticker=pos.ticker,
-                name=asset.name if asset else None,
-                asset_class=AssetClass(asset.asset_class) if asset else infer_asset_class(pos.ticker),
-                sector=(asset.sector_override or asset.sector) if asset else None,
-                quantity=pos.quantity,
-                avg_price=pos.avg_price,
-                total_cost=pos.total_cost,
-                realized_result=pos.realized_result,
-                provents_net=pos.provents_net,
-                provents_receivable_net=pos.provents_receivable_net,
-                pending_bonus_cost=pos.pending_bonus_cost,
-                first_date=pos.first_date,
-            )
-        )
-    return sorted(out, key=lambda p: p.total_cost, reverse=True)
-
-
-def get_summary(session: Session, today: date | None = None) -> PortfolioSummaryOut:
-    today = today or date.today()
-    rows = _all_rows(session)
-    result = _replay([row.to_entry() for row in rows])
-    year_ago = today - timedelta(days=365)
-    provents_12m = sum(
-        (
-            row.net_amount or ZERO
-            for row in rows
-            if row.type in PROVENT_TYPES
-            and row.status != ProventStatus.ANNOUNCED
-            and row.payment_date is not None
-            and year_ago < row.payment_date <= today
-        ),
-        ZERO,
-    )
-    positions = result.positions.values()
-    return PortfolioSummaryOut(
-        invested=sum((p.total_cost for p in positions if p.is_open), ZERO),
-        realized_result=sum((p.realized_result for p in positions), ZERO),
-        provents_net_total=sum((p.provents_net for p in positions), ZERO),
-        provents_net_12m=provents_12m,
-        provents_receivable=sum((p.provents_receivable_net for p in positions), ZERO),
-        open_positions=sum(1 for p in positions if p.is_open),
-        pending_bonus_cost=sum(1 for p in positions if p.is_open and p.pending_bonus_cost),
-    )

@@ -165,6 +165,11 @@ def _get(result: PortfolioResult, ticker: str, day: date) -> Position:
     return pos
 
 
+def apply_entry(result: PortfolioResult, e: LedgerEntry) -> None:
+    """Apply a single entry in place (callers must feed entries in `sort_entries` order)."""
+    _apply(result, e)
+
+
 def _apply(result: PortfolioResult, e: LedgerEntry) -> None:
     match e.type:
         case TransactionType.BUY:
