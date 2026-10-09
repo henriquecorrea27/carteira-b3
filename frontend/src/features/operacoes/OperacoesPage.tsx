@@ -4,7 +4,7 @@ import { AlertTriangle, CalendarRange, MoreHorizontal, Pencil, Plus, Rows3, Sear
 import { toast } from "sonner";
 import { useDeleteTransaction, useSummary, useTransactions } from "@/api/hooks";
 import type { Source, Transaction, TransactionType } from "@/api/types";
-import { SourceBadge } from "@/components/domain";
+import { Private, SourceBadge } from "@/components/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -223,10 +223,10 @@ export function OperacoesPage() {
                         )}
                         {t.note && <div className="max-w-56 truncate text-sm text-muted">{t.note}</div>}
                       </TD>
-                      <TD numeric>{formatQuantity(t.quantity)}</TD>
+                      <TD numeric><Private>{formatQuantity(t.quantity)}</Private></TD>
                       <TD numeric>{t.price ? formatBRL(t.price, { precise: INCOME_TYPES.includes(t.type) }) : "—"}</TD>
-                      <TD numeric className="text-ink-2">{t.costs ? formatBRL(t.costs) : "—"}</TD>
-                      <TD numeric className="font-medium">{amountOf(t)}</TD>
+                      <TD numeric className="text-ink-2"><Private>{t.costs ? formatBRL(t.costs) : "—"}</Private></TD>
+                      <TD numeric className="font-medium"><Private>{amountOf(t)}</Private></TD>
                       <TD className="max-w-40 truncate text-ink-2">{t.broker ?? "—"}</TD>
                       <TD>
                         <SourceBadge source={t.source} edited={t.user_edited} />

@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Monitor, Moon, RefreshCw, Sun } from "lucide-react";
+import { Eye, EyeOff, Monitor, Moon, RefreshCw, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { useRefreshPrices, useSummary } from "@/api/hooks";
 import { USE_MOCKS } from "@/api/endpoints";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/menu";
 import { formatDateTimeShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { usePrivacy } from "./privacy";
 import { useTheme, type ThemePreference } from "./theme";
 
 const TABS = [
@@ -62,6 +63,16 @@ function ThemeMenu() {
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function PrivacyToggle() {
+  const [hidden, setHidden] = usePrivacy();
+  const label = hidden ? "Mostrar valores" : "Ocultar valores";
+  return (
+    <Button variant="ghost" size="icon" aria-label={label} title={label} aria-pressed={hidden} onClick={() => setHidden(!hidden)}>
+      {hidden ? <EyeOff /> : <Eye />}
+    </Button>
   );
 }
 
@@ -132,6 +143,7 @@ export function AppShell() {
               </span>
             )}
             <RefreshPrices />
+            <PrivacyToggle />
             <ReportDialog />
             <ThemeMenu />
           </div>

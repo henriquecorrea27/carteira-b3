@@ -209,3 +209,14 @@
     font-stretch: 88%;
   }
 }
+
+/* Privacy mode (eye button in the header): blur the portfolio's amounts and quantities. */
+/* Blur scales with the font size so big figures (the patrimony) are as unreadable as small ones. */
+:root[data-privacy="on"] .sensitive,
+:root[data-privacy="on"] .sensitive-axis .recharts-yAxis-tick-labels {
+  filter: blur(0.42em);
+  user-select: none;
+}
+.sensitive {
+  transition: filter 150ms ease;
+}

@@ -33,6 +33,7 @@ export interface TooltipRow {
   value: string;
   color: string;
   shape?: "line" | "bar";
+  sensitive?: boolean; // blurred in privacy mode
 }
 
 /** Tooltip body: value first (strong), series name second, keyed by a short stroke. */
@@ -48,7 +49,7 @@ export function ChartTooltipBox({ title, rows, footer }: { title: ReactNode; row
               className={cn("shrink-0 rounded-full", r.shape === "bar" ? "h-2.5 w-2.5 rounded-[3px]" : "h-0.5 w-3")}
               style={{ background: r.color }}
             />
-            <span className="num font-semibold">{r.value}</span>
+            <span className={cn("num font-semibold", r.sensitive && "sensitive")}>{r.value}</span>
             <span className="text-sm text-ink-2">{r.label}</span>
           </li>
         ))}

@@ -33,7 +33,7 @@ export function DividendBars({
           ...(hasReceivable ? [{ label: "A receber", color: RECEIVABLE, shape: "bar" as const }] : []),
         ]}
       />
-      <div style={{ height }}>
+      <div className="sensitive-axis" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
@@ -56,9 +56,9 @@ export function DividendBars({
                   <ChartTooltipBox
                     title={formatMonthLong(row.month)}
                     rows={[
-                      { key: "r", label: "Recebidos", value: formatBRL(row.received), color: RECEIVED, shape: "bar" },
+                      { key: "r", label: "Recebidos", value: formatBRL(row.received), color: RECEIVED, shape: "bar", sensitive: true },
                       ...(row.receivable > 0
-                        ? [{ key: "a", label: "A receber", value: formatBRL(row.receivable), color: RECEIVABLE, shape: "bar" as const }]
+                        ? [{ key: "a", label: "A receber", value: formatBRL(row.receivable), color: RECEIVABLE, shape: "bar" as const, sensitive: true }]
                         : []),
                     ]}
                   />

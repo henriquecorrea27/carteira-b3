@@ -30,7 +30,7 @@ export function EquityChart({ data, height = 280 }: { data: EquityPoint[]; heigh
           { label: "Valor aplicado", color: INVESTED },
         ]}
       />
-      <div style={{ height }}>
+      <div className="sensitive-axis" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={rows} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
@@ -52,12 +52,12 @@ export function EquityChart({ data, height = 280 }: { data: EquityPoint[]; heigh
                   <ChartTooltipBox
                     title={formatDate(row.date)}
                     rows={[
-                      { key: "e", label: "Patrimônio", value: formatBRL(row.equity), color: EQUITY },
-                      { key: "i", label: "Valor aplicado", value: formatBRL(row.invested), color: INVESTED },
+                      { key: "e", label: "Patrimônio", value: formatBRL(row.equity), color: EQUITY, sensitive: true },
+                      { key: "i", label: "Valor aplicado", value: formatBRL(row.invested), color: INVESTED, sensitive: true },
                     ]}
                     footer={
                       <>
-                        Resultado <span className={gain >= 0 ? "num font-medium text-up" : "num font-medium text-down"}>{formatBRL(gain, { signed: true })}</span>
+                        Resultado <span className={gain >= 0 ? "sensitive num font-medium text-up" : "sensitive num font-medium text-down"}>{formatBRL(gain, { signed: true })}</span>
                       </>
                     }
                   />

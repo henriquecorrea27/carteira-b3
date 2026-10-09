@@ -55,7 +55,7 @@ export function AllocationStrip({ slices, maxSlices = 7, className }: { slices: 
           >
             <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: s.color }} />
             <span className="font-medium">{s.label}</span>
-            <span className="num text-ink-2" title={formatBRL(s.value)}>
+            <span className="num text-ink-2">
               {formatPct((s.value / total) * 100, { decimals: 1 })}
             </span>
           </li>
@@ -81,7 +81,7 @@ export function AllocationBars({ slices, className }: { slices: Slice[]; classNa
               style={{ width: `${(s.value / max) * 100}%`, background: "var(--series-1)" }}
             />
           </span>
-          <span className="num hidden text-right text-ink-2 sm:block">{formatBRL(s.value)}</span>
+          <span className="sensitive num hidden text-right text-ink-2 sm:block">{formatBRL(s.value)}</span>
           <span className="num text-right font-medium">{formatPct((s.value / total) * 100, { decimals: 1 })}</span>
         </li>
       ))}

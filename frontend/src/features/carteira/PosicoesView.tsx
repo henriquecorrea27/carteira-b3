@@ -4,7 +4,7 @@ import { AlertTriangle, Search, Wallet } from "lucide-react";
 import { usePositions } from "@/api/hooks";
 import type { AssetClass, Position } from "@/api/types";
 import { AllocationBars } from "@/components/charts/AllocationStrip";
-import { AssetCell, DecisionBadge, Delta, ScoreMeter } from "@/components/domain";
+import { AssetCell, DecisionBadge, Delta, Private, ScoreMeter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/form";
 import { Tooltip } from "@/components/ui/menu";
@@ -66,7 +66,7 @@ function ClassGroup({
         <dl className="ml-auto flex flex-wrap gap-x-6 gap-y-1 text-sm">
           <div className="flex gap-1.5">
             <dt className="text-ink-2">Valor</dt>
-            <dd className="num font-semibold">{formatBRL(value)}</dd>
+            <dd className="sensitive num font-semibold">{formatBRL(value)}</dd>
           </div>
           <div className="flex gap-1.5">
             <dt className="text-ink-2">Resultado</dt>
@@ -108,7 +108,7 @@ function ClassGroup({
               <TD>
                 <AssetCell ticker={p.ticker} name={p.name} assetClass={p.asset_class} />
               </TD>
-              <TD numeric>{formatQuantity(p.quantity)}</TD>
+              <TD numeric><Private>{formatQuantity(p.quantity)}</Private></TD>
               <TD numeric>
                 <span className="inline-flex items-center gap-1">
                   {p.pending_cost && (
@@ -123,16 +123,16 @@ function ClassGroup({
               <TD numeric>
                 <Delta value={p.day_change_pct} arrow={false} />
               </TD>
-              <TD numeric className="font-medium">{formatBRL(p.market_value)}</TD>
+              <TD numeric className="font-medium"><Private>{formatBRL(p.market_value)}</Private></TD>
               <TD numeric>{formatPct(p.weight_pct, { decimals: 1 })}</TD>
               <TD numeric>
                 <div className="flex flex-col items-end leading-tight">
                   <Delta value={p.pnl_pct} />
-                  <span className="text-sm text-ink-2">{formatBRL(p.pnl, { signed: true })}</span>
+                  <span className="sensitive text-sm text-ink-2">{formatBRL(p.pnl, { signed: true })}</span>
                 </div>
               </TD>
               <TD numeric>{formatPct(p.yield_on_cost_pct, { decimals: 1 })}</TD>
-              <TD numeric>{formatBRL(p.dividends_received)}</TD>
+              <TD numeric><Private>{formatBRL(p.dividends_received)}</Private></TD>
               {isStock && (
                 <TD numeric>
                   {p.rules ? <ScoreMeter score={p.rules.score_final} inconclusive={p.rules.inconclusive} /> : "—"}

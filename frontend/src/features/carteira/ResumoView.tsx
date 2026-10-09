@@ -6,7 +6,7 @@ import type { Decision, Position } from "@/api/types";
 import { AllocationStrip } from "@/components/charts/AllocationStrip";
 import { DividendBars } from "@/components/charts/DividendBars";
 import { EquityChart } from "@/components/charts/EquityChart";
-import { DecisionBadge, Delta, ScoreMeter } from "@/components/domain";
+import { DecisionBadge, Delta, Private, ScoreMeter } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Panel, PanelHeader, Skeleton } from "@/components/ui/misc";
 import { Segmented } from "@/components/ui/segmented";
@@ -20,11 +20,11 @@ function StatStrip() {
   const { data, isPending } = useSummary();
   const cells: { label: string; value: React.ReactNode; sub?: React.ReactNode }[] = data
     ? [
-        { label: "Valor investido", value: formatBRL(data.invested) },
+        { label: "Valor investido", value: <Private>{formatBRL(data.invested)}</Private> },
         {
           label: "Lucro em aberto",
           value: <Delta value={data.unrealized_pnl} kind="brl" arrow={false} className="font-semibold" />,
-          sub: <>Realizado <span className="num">{formatBRL(data.realized_pnl, { signed: true })}</span></>,
+          sub: <>Realizado <span className="sensitive num">{formatBRL(data.realized_pnl, { signed: true })}</span></>,
         },
         {
           label: "Rentabilidade 12 meses",
@@ -33,10 +33,10 @@ function StatStrip() {
         },
         {
           label: "Proventos 12 meses",
-          value: formatBRL(data.dividends_12m),
-          sub: <>Total <span className="num">{formatBRL(data.dividends_total)}</span></>,
+          value: <Private>{formatBRL(data.dividends_12m)}</Private>,
+          sub: <>Total <span className="sensitive num">{formatBRL(data.dividends_total)}</span></>,
         },
-        { label: "A receber", value: formatBRL(data.dividends_receivable), sub: "proventos anunciados" },
+        { label: "A receber", value: <Private>{formatBRL(data.dividends_receivable)}</Private>, sub: "proventos anunciados" },
       ]
     : [];
   return (
@@ -148,7 +148,7 @@ function UpcomingDividends() {
                   {i.kind === "EX_DATE" ? "data-com" : "pagamento"} · {DIVIDEND_TYPE_LABEL[i.dividend.type]}
                 </span>
               </span>
-              <span className="num text-sm">{formatBRL(i.dividend.net)}</span>
+              <span className="sensitive num text-sm">{formatBRL(i.dividend.net)}</span>
             </li>
           ))}
         </ul>

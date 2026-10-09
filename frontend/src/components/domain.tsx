@@ -59,6 +59,11 @@ export function ScoreMeter({
   );
 }
 
+/** Portfolio amount or quantity: blurred in privacy mode (eye button in the header). */
+export function Private({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <span className={cn("sensitive", className)}>{children}</span>;
+}
+
 /** Signed money or percentage colored by direction, with an arrow so it survives without color. */
 export function Delta({
   value,
@@ -83,6 +88,7 @@ export function Delta({
         sign > 0 && "text-up",
         sign < 0 && "text-down",
         sign === 0 && "text-ink-2",
+        kind === "brl" && "sensitive",
         className,
       )}
     >

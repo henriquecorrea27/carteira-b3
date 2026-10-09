@@ -35,7 +35,7 @@ export function CarteiraPage() {
             <>
               <p className="mt-1 text-hero font-semibold tracking-[-0.035em]">
                 <span className="mr-1.5 align-[0.42em] text-xl font-medium tracking-normal text-ink-2">R$</span>
-                {formatBRL(summary.data.equity).replace(/^R\$\s/, "")}
+                <span className="sensitive">{formatBRL(summary.data.equity).replace(/^R\$\s/, "")}</span>
               </p>
               <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-2">
                 <span className="inline-flex items-center gap-1.5">

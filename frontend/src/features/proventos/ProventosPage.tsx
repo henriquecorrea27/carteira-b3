@@ -4,7 +4,7 @@ import { useAgendaEstimates, useDividends, useSummary } from "@/api/hooks";
 import type { AssetClass, Dividend, DividendStatus } from "@/api/types";
 import { AllocationBars } from "@/components/charts/AllocationStrip";
 import { DividendBars } from "@/components/charts/DividendBars";
-import { DividendStatusBadge } from "@/components/domain";
+import { DividendStatusBadge, Private } from "@/components/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/form";
@@ -35,10 +35,10 @@ function Summary({ dividends, today }: { dividends: Dividend[]; today: string })
   const receivable = dividends.filter((d) => !isReceived(d)).reduce((a, d) => a + Number(d.net), 0);
   const taxes = received.filter((d) => (d.pay_date ?? d.ex_date) > yearAgo).reduce((a, d) => a + Number(d.tax), 0);
   const cells = [
-    { label: "Média mensal", value: formatBRL(last12 / 12), sub: "últimos 12 meses" },
-    { label: "Recebido em 12 meses", value: formatBRL(last12), sub: <>IR retido <span className="num">{formatBRL(taxes)}</span></> },
-    { label: "Recebido desde o início", value: formatBRL(total) },
-    { label: "A receber", value: formatBRL(receivable), sub: "já anunciados" },
+    { label: "Média mensal", value: <Private>{formatBRL(last12 / 12)}</Private>, sub: "últimos 12 meses" },
+    { label: "Recebido em 12 meses", value: <Private>{formatBRL(last12)}</Private>, sub: <>IR retido <span className="sensitive num">{formatBRL(taxes)}</span></> },
+    { label: "Recebido desde o início", value: <Private>{formatBRL(total)}</Private> },
+    { label: "A receber", value: <Private>{formatBRL(receivable)}</Private>, sub: "já anunciados" },
   ];
   return (
     <dl className="mb-6 grid grid-cols-2 gap-y-4 border-y border-line py-4 md:grid-cols-4">
@@ -79,7 +79,7 @@ function Agenda({ dividends, today }: { dividends: Dividend[]; today: string }) 
                 </span>
               </span>
               <span className="text-right">
-                <span className="num block font-medium">{formatBRL(i.dividend.net)}</span>
+                <span className="sensitive num block font-medium">{formatBRL(i.dividend.net)}</span>
                 <span className="num block text-sm text-muted">{formatBRL(i.dividend.amount_per_share, { precise: true })} por {i.dividend.asset_class === "STOCK" || i.dividend.asset_class === "BDR" ? "ação" : "cota"}</span>
               </span>
             </li>
@@ -118,7 +118,7 @@ function HistoryTable({ dividends, today }: { dividends: Dividend[]; today: stri
                 </TD>
               ))}
               <TD numeric className="text-ink-2">{formatNumber(r.average, { minDecimals: 2, maxDecimals: 2 })}</TD>
-              <TD numeric className="font-semibold">{formatBRL(r.total)}</TD>
+              <TD numeric className="font-semibold"><Private>{formatBRL(r.total)}</Private></TD>
             </TR>
           ))}
         </TBody>
@@ -143,7 +143,7 @@ function DetailList({ dividends }: { dividends: Dividend[] }) {
         title="Meus proventos"
         description={
           <>
-            {rows.length} lançamentos · líquido <span className="num font-medium text-ink">{formatBRL(total)}</span>
+            {rows.length} lançamentos · líquido <span className="sensitive num font-medium text-ink">{formatBRL(total)}</span>
           </>
         }
         actions={
@@ -195,11 +195,11 @@ function DetailList({ dividends }: { dividends: Dividend[] }) {
               </TD>
               <TD numeric>{formatDate(d.ex_date)}</TD>
               <TD numeric>{d.pay_date ? formatDate(d.pay_date) : <Badge tone="neutral">a definir</Badge>}</TD>
-              <TD numeric>{formatQuantity(d.quantity)}</TD>
+              <TD numeric><Private>{formatQuantity(d.quantity)}</Private></TD>
               <TD numeric>{formatBRL(d.amount_per_share, { precise: true })}</TD>
-              <TD numeric>{formatBRL(d.gross)}</TD>
-              <TD numeric className={Number(d.tax) ? undefined : "text-muted"}>{formatBRL(d.tax)}</TD>
-              <TD numeric className="font-semibold">{formatBRL(d.net)}</TD>
+              <TD numeric><Private>{formatBRL(d.gross)}</Private></TD>
+              <TD numeric className={Number(d.tax) ? undefined : "text-muted"}><Private>{formatBRL(d.tax)}</Private></TD>
+              <TD numeric className="font-semibold"><Private>{formatBRL(d.net)}</Private></TD>
             </TR>
           ))}
         </TBody>
@@ -305,7 +305,7 @@ export function ProventosPage() {
                           <li key={d.id} className="flex items-center gap-2 py-1 text-sm">
                             <span className="w-16 font-semibold">{d.ticker}</span>
                             <span className="text-ink-2">{DIVIDEND_TYPE_LABEL[d.type]}</span>
-                            <span className="num ml-auto font-medium">{formatBRL(d.net)}</span>
+                            <span className="sensitive num ml-auto font-medium">{formatBRL(d.net)}</span>
                           </li>
                         ))}
                       </ul>

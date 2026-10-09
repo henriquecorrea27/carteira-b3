@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel, PanelHeader } from "@/components/ui/misc";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
+import { Private } from "@/components/domain";
 import { formatBRL, formatDate, formatQuantity } from "@/lib/format";
 import { IMPORT_STATUS_LABEL, TX_TYPE_LABEL } from "@/lib/labels";
 import { cn } from "@/lib/utils";
@@ -152,9 +153,9 @@ function Preview({ preview, onCancel, onCommit, committing }: { preview: ImportP
               <TD className="font-semibold">{r.ticker ?? "—"}</TD>
               <TD>{r.kind}</TD>
               <TD>{r.mapped_type ? TX_TYPE_LABEL[r.mapped_type] : <span className="text-muted">—</span>}</TD>
-              <TD numeric>{r.quantity && /^[\d.]+$/.test(r.quantity) ? formatQuantity(r.quantity) : (r.quantity ?? "—")}</TD>
+              <TD numeric><Private>{r.quantity && /^[\d.]+$/.test(r.quantity) ? formatQuantity(r.quantity) : (r.quantity ?? "—")}</Private></TD>
               <TD numeric>{r.price ? formatBRL(r.price, { precise: true }) : "—"}</TD>
-              <TD numeric>{formatBRL(r.value)}</TD>
+              <TD numeric><Private>{formatBRL(r.value)}</Private></TD>
               <TD className="max-w-80 whitespace-normal text-sm text-ink-2">{r.reason ?? ""}</TD>
             </TR>
           ))}
