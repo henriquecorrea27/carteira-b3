@@ -293,12 +293,11 @@ def render(report: DailyReport) -> str:
         )
 
     if report.market_value is not None:
-        line = f"**Patrimônio:** {brl(report.market_value)}"
+        # Only percentages: the report does not show the patrimony in R$
         if report.day_change is not None:
             base = report.market_value - report.day_change
             change_pct = report.day_change / base if base else None
-            line += f" · dia {brl(report.day_change, signed=True)} ({pct(change_pct)})"
-        out.append(line)
+            out.append(f"**Carteira no dia:** {pct(change_pct)}")
         if report.return_12m is not None:
             out.append(
                 f"-# 12 meses: carteira {pct(report.return_12m)} · IBOV {pct(report.ibov_12m)} · "

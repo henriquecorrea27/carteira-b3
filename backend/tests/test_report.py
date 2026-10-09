@@ -157,6 +157,8 @@ def test_report_sections(client, session_factory):
     assert report.upcoming_until == date(2026, 10, 16)  # 5 business days, skipping the 12/10 holiday
 
     assert "## 📊 Carteira B3 · qui, 08/10/2026" in text
+    assert "**Carteira no dia:** +5,57%" in text  # (1821 − 1725) / 1725
+    assert "Patrimônio" not in text and "1.821" not in text
     assert "**CMIG4**: 🟡 Aguardar → **🟢 Comprar** · nota 83,5" in text
     assert "**CMIG4** · nota 83,5 · R$ 12,00 (+9,09%)" in text
     assert "-# Margem de segurança Graham 58,9% a favor" in text
