@@ -49,3 +49,6 @@ logs/
 
 # Downloaded public datasets (CVM) — cache, not versioned
 backend/data/
+
+# Claude Code local settings
+.claude/
