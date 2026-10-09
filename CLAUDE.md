@@ -67,7 +67,8 @@ cd backend && uv run python -m app.jobs.update_prices          # cotações, IBO
 cd backend && uv run python -m app.jobs.sync_corporate_events  # proventos e eventos da B3
 cd backend && uv run python -m app.jobs.ingest_cvm             # dados da CVM + indicadores (mensal)
 cd backend && uv run python -m app.jobs.daily_analysis         # regras para as ações da carteira (diário)
-cd backend && uv run python -m app.jobs.daily_report   # (F7) relatório diário manual
+cd backend && uv run python -m app.jobs.daily_report           # relatório diário (--dry-run mostra, --now envia já)
+powershell -ExecutionPolicy Bypass -File scriptsegister_tasks.ps1  # agenda os jobs no Windows (-Remove desfaz)
 cd frontend && npm run dev                         # UI em http://localhost:5180 (proxy /api → :8000)
 ```
 
@@ -392,6 +393,26 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
   - **Catch-up:** se o relatório do dia não foi enviado (computador desligado), envia na próxima execução, marcado como atrasado.
   - Registro de envios em banco para não mandar em duplicidade.
 - Botão na UI: **"Enviar relatório agora"** (para teste).
+
+### 6.4 Implementação (F7, `app/notifications/`)
+- `report.py` monta o relatório (dados da carteira, último snapshot de cada ação, proventos, pendências) e o
+  renderiza em Markdown do Discord; `discord.py` envia como texto simples (≤ 2.000 caracteres por mensagem,
+  divididas por seção; menções desligadas; trata rate limit 429). Erros nunca mostram a URL do webhook.
+- Mudanças de decisão são comparadas com as decisões gravadas no **último relatório agendado enviado**
+  (`report_dispatches.decisions`), não com o snapshot de ontem: assim um dia sem envio não esconde mudanças.
+  O primeiro relatório não tem comparação.
+- "Pagos hoje" vira "Pagos desde dd/mm" quando houve dias sem relatório (janela máx. de 31 dias). Também mostra
+  o total a receber já anunciado.
+- Pendências também incluem ações sem análise e análises com mais de 3 dias.
+- Agendamento: **Agendador de Tarefas do Windows** (`scripts/register_tasks.ps1`, usuário atual, sem admin):
+  dias úteis às `REPORT_TIME` + ao entrar no Windows, com "executar assim que possível" se perdeu o horário.
+  O job `daily_report` atualiza cotações → proventos → reanálise antes de enviar e só envia o que está devido:
+  dia útil mais recente cujo horário já passou; enviado com mais de 2 h de atraso → marcado como atrasado.
+  Vários dias perdidos → só o mais recente. Envio que falhou é tentado de novo na próxima execução.
+- Sem APScheduler: o agendador do Windows já cobre o caso com o backend aberto; um advisory lock do Postgres
+  impede dois envios simultâneos. Envio manual (botão/`--now`) fica registrado como `MANUAL` e não conta como o
+  envio do dia.
+- Webhook não configurado: o job sai sem atualizar nem enviar (registra aviso no log).
 
 ---
 

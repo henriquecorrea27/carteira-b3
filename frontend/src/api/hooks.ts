@@ -14,6 +14,8 @@ export const queryKeys = {
   search: (q: string) => ["assets", "search", q] as const,
   analysis: (t: string) => ["analysis", t] as const,
   priceBars: (t: string) => ["prices", t] as const,
+  reportPreview: ["report", "preview"] as const,
+  reportDispatches: ["report", "dispatches"] as const,
 };
 
 export const useSummary = () => useQuery({ queryKey: queryKeys.summary, queryFn: api.getSummary });
@@ -104,7 +106,21 @@ export function useRefreshPrices() {
         qc.invalidateQueries({ queryKey: ["dividends"] }),
         qc.invalidateQueries({ queryKey: ["transactions"] }),
         qc.invalidateQueries({ queryKey: ["analysis"] }),
+        qc.invalidateQueries({ queryKey: ["report"] }),
       ]),
+  });
+}
+
+export const useReportPreview = (enabled: boolean) =>
+  useQuery({ queryKey: queryKeys.reportPreview, queryFn: api.getReportPreview, enabled });
+export const useReportDispatches = (enabled: boolean) =>
+  useQuery({ queryKey: queryKeys.reportDispatches, queryFn: api.getReportDispatches, enabled });
+
+export function useSendReport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.sendReport,
+    onSettled: () => qc.invalidateQueries({ queryKey: ["report"] }),
   });
 }
 

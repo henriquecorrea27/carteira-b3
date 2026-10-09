@@ -18,6 +18,8 @@ import type {
   PortfolioSummary,
   Position,
   PriceBar,
+  ReportDispatch,
+  ReportPreview,
   ReturnPoint,
   SourceWarning,
   Transaction,
@@ -415,6 +417,22 @@ export const api = {
               .post<W.PortfolioRun>("/analysis/portfolio")
               .then((run) => ({ updated: r.prices_inserted, failed: r.errors.length + e.errors.length + run.errors.length })),
           ),
+
+  // Daily report (Discord). Mocks: a static preview; sending is not available.
+  getReportPreview: (): Promise<ReportPreview> =>
+    USE_MOCKS
+      ? Promise.resolve({
+          date: "2026-10-08",
+          content: "## 📊 Carteira B3 · qui, 08/10/2026\n-# Prévia indisponível nos dados de demonstração.",
+          messages: [],
+          configured: false,
+          report_time: "19:00",
+          last_scheduled: null,
+        })
+      : http.get<ReportPreview>("/report/preview"),
+  getReportDispatches: (): Promise<ReportDispatch[]> =>
+    USE_MOCKS ? Promise.resolve([]) : http.get<ReportDispatch[]>("/report/dispatches"),
+  sendReport: (): Promise<ReportDispatch> => http.post<ReportDispatch>("/report/send"),
 
   // Import
   previewImport: (file: File): Promise<ImportPreview> =>

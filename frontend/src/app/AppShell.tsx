@@ -3,6 +3,7 @@ import { Monitor, Moon, RefreshCw, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { useRefreshPrices, useSummary } from "@/api/hooks";
 import { USE_MOCKS } from "@/api/endpoints";
+import { ReportDialog } from "@/features/relatorio/ReportDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -131,6 +132,7 @@ export function AppShell() {
               </span>
             )}
             <RefreshPrices />
+            <ReportDialog />
             <ThemeMenu />
           </div>
         </div>

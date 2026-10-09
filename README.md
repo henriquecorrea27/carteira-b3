@@ -16,7 +16,7 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
 | F4 — Importador B3 | ✅ backend + tela de importação |
 | F5 — Dados da CVM, ticker ↔ CNPJ, setores, indicadores | ✅ |
 | F6 — Motor de regras, tela de Análise, decisão na carteira, histórico | ✅ |
-| F7 — Relatório diário no Discord | ⏳ |
+| F7 — Relatório diário no Discord | ✅ |
 | F8 — Análise gráfica | ⏳ |
 
 ## Requisitos
@@ -57,6 +57,16 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
    cd backend && uv run python -m app.jobs.daily_analysis          # regras para as ações da carteira
    ```
    Abrir http://localhost:5180.
+6. Relatório diário no Discord:
+   - No Discord: Editar canal › Integrações › Webhooks › Novo webhook › Copiar URL do webhook, e colar em
+     `DISCORD_WEBHOOK_URL` no `backend/.env` (horário em `REPORT_TIME`, padrão 19:00).
+   - Agendar no Windows (dias úteis no horário e ao entrar no Windows; dados da CVM a cada 4 semanas):
+     ```
+     powershell -ExecutionPolicy Bypass -File scriptsegister_tasks.ps1           # criar/atualizar
+     powershell -ExecutionPolicy Bypass -File scriptsegister_tasks.ps1 -Remove   # remover
+     ```
+   - Manual: `uv run python -m app.jobs.daily_report --dry-run` (só mostra), `--now` (envia já). Pela UI, o
+     botão de avião no topo abre a prévia e o "Enviar relatório agora". Log em `backend/data/logs/`.
 
 ## Testes
 
@@ -65,7 +75,7 @@ cd backend && uv run pytest
 cd frontend && npm run test
 ```
 
-## API (F1)
+## API
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -87,6 +97,9 @@ cd frontend && npm run test
 | GET | `/api/analysis/{ticker}` | Decisão por regras com explicação completa (grava o snapshot do dia) |
 | POST | `/api/analysis/portfolio` | Reanalisar todas as ações da carteira |
 | GET | `/api/prices/{ticker}` | Cotações diárias (OHLC) para o gráfico |
+| GET | `/api/report/preview` | Prévia do relatório diário (Markdown do Discord, já dividido em mensagens) |
+| POST | `/api/report/send` | Enviar o relatório agora (manual; não conta como o envio agendado) |
+| GET | `/api/report/dispatches` | Últimos envios (agendado/manual, enviado/falhou, atrasado) |
 
 Valores monetários e quantidades trafegam como **string decimal** (nunca float).
 

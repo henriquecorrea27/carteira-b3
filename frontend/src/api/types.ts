@@ -273,3 +273,24 @@ export interface ImportResult {
   ignored: number;
   errors: number;
 }
+
+export interface ReportPreview {
+  date: ISODate;
+  content: string; // Discord-flavoured Markdown, as sent
+  messages: string[];
+  configured: boolean;
+  report_time: string;
+  last_scheduled: ISODate | null;
+}
+
+export interface ReportDispatch {
+  id: number;
+  report_date: ISODate;
+  trigger: "SCHEDULED" | "MANUAL";
+  status: "SENT" | "FAILED";
+  late: boolean;
+  channel: string;
+  messages: number;
+  error: string | null;
+  created_at: ISODateTime;
+}
