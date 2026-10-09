@@ -68,8 +68,7 @@ cd backend && uv run python -m app.jobs.sync_corporate_events  # proventos e eve
 cd backend && uv run python -m app.jobs.ingest_cvm             # dados da CVM + indicadores (mensal)
 cd backend && uv run python -m app.jobs.daily_analysis         # regras para as ações da carteira (diário)
 cd backend && uv run python -m app.jobs.daily_report           # relatório diário (--dry-run mostra, --now envia já)
-powershell -ExecutionPolicy Bypass -File scripts
-egister_tasks.ps1  # agenda os jobs no Windows (-Remove desfaz)
+powershell -ExecutionPolicy Bypass -File scripts\register_tasks.ps1  # agenda os jobs no Windows (-Remove desfaz)
 cd frontend && npm run dev                         # UI em http://localhost:5180 (proxy /api → :8000)
 # Uso diário: atalhos "Carteira B3" / "Parar Carteira B3" (scripts/install_shortcuts.ps1). O backend serve o
 # frontend compilado (frontend/dist) em http://127.0.0.1:8000; start_app.ps1 recompila se o código mudou.

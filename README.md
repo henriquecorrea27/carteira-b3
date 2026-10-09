@@ -62,10 +62,8 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
      `DISCORD_WEBHOOK_URL` no `backend/.env` (horário em `REPORT_TIME`, padrão 19:00).
    - Agendar no Windows (dias úteis no horário e ao entrar no Windows; dados da CVM a cada 4 semanas):
      ```
-     powershell -ExecutionPolicy Bypass -File scripts
-egister_tasks.ps1           # criar/atualizar
-     powershell -ExecutionPolicy Bypass -File scripts
-egister_tasks.ps1 -Remove   # remover
+     powershell -ExecutionPolicy Bypass -File scripts\register_tasks.ps1           # criar/atualizar
+     powershell -ExecutionPolicy Bypass -File scripts\register_tasks.ps1 -Remove   # remover
      ```
    - Manual: `uv run python -m app.jobs.daily_report --dry-run` (só mostra), `--now` (envia já). Pela UI, o
      botão de avião no topo abre a prévia e o "Enviar relatório agora". Log em `backend/data/logs/`.
