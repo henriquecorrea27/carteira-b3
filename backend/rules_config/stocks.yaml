@@ -1,12 +1,22 @@
-# Rules for stocks — SOURCE OF TRUTH (CLAUDE.md §5).
-# ⚠️ ALL WEIGHTS ARE EQUAL while the owner evaluates them. Do not change weights, ranges or limits
-# without an explicit decision; any approved change goes here AND in CLAUDE.md §5.
+# Rules for stocks — SOURCE OF TRUTH (CLAUDE.md §5). Version 2: weights proposed by the analyst agent
+# (.claude/agents/analista-investimentos.md) and approved by the owner on 10/10/2026. Do not change weights,
+# ranges or limits without an explicit decision; any approved change goes here AND in CLAUDE.md §5.
 #
 # Gradual scoring: points = clamp((value − bad) / (good − bad), 0, 1) × weight (works for "lower is better"
-# when good < bad). Score = points earned / weights evaluated × 100. Indicators without data leave the
-# denominator; if more than `inconclusive_na_weight` of a score's weight is missing → inconclusive.
+# when good < bad). `band: [a, b, c, d]` = 0 outside a–d, full between b–c, linear in between.
+# Score = points earned / weights evaluated × 100. Missing data (N/A) leaves the denominator; if more than
+# `inconclusive_na_weight` of a group's weight is N/A → inconclusive → AGUARDAR.
+#
+# if_invalid (per rule, default `na`):
+#   na   → no value: leaves the denominator (➖)
+#   zero → no value for an ECONOMIC reason (LPA ≤ 0, EBIT ≤ 0, final value ≤ 0, EBITDA ≤ 0, no profitable
+#          year): 0 points, ❌, stays in the denominator.
+# Negative values that ARE computed (ROE < 0, CAGR < 0, net cash) are scored by the clamp as usual.
+# A rule whose indicator the engine does not compute is skipped (weights renormalize), never counted as N/A.
+# Weight 0 = shown on screen only.
 
-version: 1
+version: 2
+review_date: 2027-04-30  # after the DFP 2026 season; earlier triggers in CLAUDE.md §5
 
 status:
   good: 0.70  # ✅ ≥ 70% of the indicator's points
@@ -17,9 +27,45 @@ decision:
   price_buy_min: 60
   quality_watch_min: 50
   inconclusive_na_weight: 0.30
-  final_weights:
-    quality: 0.5
-    price: 0.5
+  final_weights:  # displayed score and ranking only; the decision uses the thresholds above
+    quality: 0.6
+    price: 0.4
+  veto_score_cap: 30  # failed eliminatory → final score ≤ 30
+  loss_price_cap: 40  # LPA TTM ≤ 0 → price score ≤ 40
+  tie_break: [score_final, score_quality, daily_liquidity]  # ordering of lists
+
+# Technical analysis (F8) inside the PRICE score: price = (1 − w) × fundamental + w × technical.
+# Disabled or not computed → w = 0. Never overrides an eliminatory.
+technical:
+  enabled: false
+  weight: null  # defined by the owner when F8 is specified (analyst's suggestion: 0.10–0.25)
+
+# Special-sector classification from the CVM SETOR_ATIV (lower-case, no accents; "Emp. Adm. Part. - <setor>"
+# holdings follow their main sector). First match in `order` wins; anything else is GENERAL.
+sector_classification:
+  order: [FINANCIAL, UTILITY, CYCLICAL]
+  FINANCIAL:
+    template: BANK  # CVM financial-institution chart of accounts → always FINANCIAL
+    pattern: "bancos|seguradoras|intermediacao financeira|arrendamento mercantil|previdencia|capitalizacao|credito imobiliario"
+  UTILITY:
+    pattern: "energia eletrica|saneamento|agua e gas"
+  CYCLICAL:
+    pattern: "metalurgia e siderurgia|extracao mineral|petroleo e gas|papel e celulose|petroquimicos|agricultura|reflorestamento"
+  overrides:  # ticker root → sector, for CVM misclassifications
+    AMBP: GENERAL  # Ambipar: environmental services registered as "Saneamento"
+
+# Data sanity: implausible value → indicator N/A + warning "valor implausível — conferir nº de ações".
+plausibility:
+  pe_min: 1.5  # also P/L (lucro médio 5a)
+  pb_min: 0.10
+  dy_5y_max: 0.25
+  ev_ebit_min: 0.5  # only for positive values; also EV/EBIT (EBIT médio 5a)
+
+# Data freshness (not a veto): latest balance older than 8 months, or no DFP of the last closed year after
+# 15/05 → both scores inconclusive (AGUARDAR) + warning.
+staleness:
+  max_balance_age_months: 8
+  dfp_deadline: [5, 15]  # month, day
 
 eliminatory:
   E1:
@@ -32,36 +78,101 @@ eliminatory:
     label: "Dívida líquida / EBITDA"
     max: 3.5
     max_utility: 4.5
+    max_cyclical: 3.0  # over the 5-year average EBITDA (fallback: TTM)
   E4:
     label: "Liquidez média diária"
     min_brl: 2000000
+  E5:
+    label: "Sem recuperação judicial, falência ou liquidação"
+    blocked_status:  # CVM registry SIT_EMISSOR
+      - "EM RECUPERACAO JUDICIAL OU EQUIVALENTE"
+      - "EM RECUPERACAO EXTRAJUDICIAL"
+      - "FALIDA"
+      - "LIQUIDACAO EXTRAJUDICIAL"
+      - "EM LIQUIDACAO JUDICIAL"
+      - "PARALISADA"
+    manual: [AMBP]  # ticker roots; Ambipar filed for judicial recovery in 10/2025, CVM still shows it operating
 
+# ---------------------------------------------------------------- GENERAL (default) -------------------
 quality:
-  - { key: roe_5y, label: "ROE médio 5a", bad: 0.08, good: 0.20, weight: 12.5 }
-  - { key: roic, label: "ROIC", bad: 0.06, good: 0.15, weight: 12.5 }
-  - { key: net_margin_5y, label: "Margem líquida média 5a", bad: 0.05, good: 0.15, weight: 12.5 }
-  - { key: cagr_earnings_5y, label: "CAGR lucro 5a", bad: 0.0, good: 0.12, weight: 12.5 }
-  # Net cash (negative ratio) is "great" by the clamp
-  - { key: net_debt_ebitda, label: "Dívida líquida / EBITDA", bad: 3.0, good: 0.5, weight: 12.5 }
-  - { key: cagr_revenue_5y, label: "CAGR receita 5a", bad: 0.0, good: 0.10, weight: 12.5 }
-  - { key: current_ratio, label: "Liquidez corrente", bad: 0.8, good: 1.5, weight: 12.5 }
-  # Band: zero at/below 0% and at/above 100%, great between 25% and 80%, linear in between
-  - { key: payout_5y, label: "Payout médio 5a", band: [0.0, 0.25, 0.80, 1.0], weight: 12.5 }
+  # Profitability 35
+  - { key: roic, label: "ROIC", bad: 0.06, good: 0.16, weight: 20 }
+  - { key: roe_5y, label: "ROE médio 5a", bad: 0.08, good: 0.20, weight: 10 }
+  - { key: net_margin_5y, label: "Margem líquida média 5a", bad: 0.05, good: 0.15, weight: 5 }
+  # Leverage and solvency 25 (net cash = great by the clamp)
+  - { key: net_debt_ebitda, label: "Dívida líquida / EBITDA", bad: 3.0, good: 0.5, weight: 20, if_invalid: zero }
+  - { key: current_ratio, label: "Liquidez corrente", bad: 0.8, good: 1.5, weight: 5 }
+  # Growth 20 (nominal; "bad" ≈ inflation = zero real growth)
+  - { key: cagr_revenue_5y, label: "CAGR receita 5a", bad: 0.05, good: 0.15, weight: 10, if_invalid: zero }
+  - { key: cagr_earnings_5y, label: "CAGR lucro 5a", bad: 0.05, good: 0.18, weight: 10, if_invalid: zero }
+  # Earnings quality 15
+  - { key: cash_conversion_5y, label: "FCO / lucro 5a", bad: 0.6, good: 1.0, weight: 10 }
+  - { key: earnings_drops_5y, label: "Quedas de lucro > 25% (5a)", bad: 3, good: 0, weight: 5 }
+  # Payout policy 5
+  - { key: payout_5y, label: "Payout médio 5a", band: [0.0, 0.25, 0.80, 1.0], weight: 5, if_invalid: zero }
 
 price:
-  - { key: graham_margin, label: "Margem de segurança Graham", bad: -0.20, good: 0.30, weight: 20 }
-  - { key: pe, label: "P/L", bad: 25, good: 8, weight: 20 }
-  - { key: ev_ebit, label: "EV/EBIT", bad: 15, good: 6, weight: 20 }
+  - { key: ev_ebit, label: "EV/EBIT", bad: 15, good: 6, weight: 30, if_invalid: zero }
+  - { key: pe, label: "P/L", bad: 20, good: 7, weight: 20, if_invalid: zero }
   - { key: dy_5y, label: "DY médio 5a", bad: 0.02, good: 0.08, weight: 20 }
-  - { key: pb, label: "P/VP", bad: 3.0, good: 1.0, weight: 20 }
+  - { key: pb, label: "P/VP", bad: 3.0, good: 1.0, weight: 10 }
+  - { key: fcf_yield, label: "FCF yield", bad: 0.02, good: 0.10, weight: 20 }
+  # Graham: shown only — it is √(22,5 / (P/L × P/VP)) − 1, i.e. P/L and P/VP again
+  - { key: graham_margin, label: "Margem de segurança Graham", bad: -0.20, good: 0.30, weight: 0 }
 
+# ---------------------------------------------------------------- sector rules ------------------------
+# A list of KEYS filters the general rules; a list of RULE DICTS replaces them (own weights and ranges).
 sectors:
   FINANCIAL:
-    # Banks and insurers: no EBITDA, net debt, ROIC, EV/EBIT or current ratio. Reduced set, equal weights.
+    # Banks and insurers: no EBITDA, net debt, ROIC, EV/EBIT, current ratio or cash flow
     warning: "análise parcial — setor financeiro"
-    eliminatory: [E1, E2, E4]
-    quality: [roe_5y, cagr_earnings_5y, payout_5y]
-    price: [pe, pb, dy_5y]
+    eliminatory: [E1, E2, E4, E5]
+    quality:
+      - { key: roe_5y, label: "ROE médio 5a", bad: 0.10, good: 0.20, weight: 45 }
+      - { key: cagr_earnings_5y, label: "CAGR lucro 5a", bad: 0.05, good: 0.15, weight: 20, if_invalid: zero }
+      - { key: cagr_book_5y, label: "CAGR patrimônio 5a", bad: 0.04, good: 0.12, weight: 15 }
+      # Banks only (insurers' assets are mostly reserves): rule skipped for other templates
+      - { key: equity_to_assets, label: "PL / ativo total", bad: 0.06, good: 0.10, weight: 10, applies_to_template: BANK }
+      - { key: payout_5y, label: "Payout médio 5a", band: [0.0, 0.25, 0.90, 1.10], weight: 10, if_invalid: zero }
+    price:
+      - { key: pe, label: "P/L", bad: 15, good: 6, weight: 40, if_invalid: zero }
+      - { key: dy_5y, label: "DY médio 5a", bad: 0.03, good: 0.09, weight: 40 }
+      - { key: pb, label: "P/VP", bad: 2.5, good: 0.9, weight: 20 }
+
   UTILITY:
-    # Energy and sanitation: E3 limit 4.5 (eliminatory.E3.max_utility)
+    # Energy, sanitation, water and gas: E3 limit 4.5 (eliminatory.E3.max_utility)
     warning: null
+    quality:
+      - { key: roic, label: "ROIC", bad: 0.05, good: 0.12, weight: 20 }
+      - { key: roe_5y, label: "ROE médio 5a", bad: 0.08, good: 0.18, weight: 15 }
+      - { key: net_debt_ebitda, label: "Dívida líquida / EBITDA", bad: 4.5, good: 2.0, weight: 25, if_invalid: zero }
+      - { key: current_ratio, label: "Liquidez corrente", bad: 0.6, good: 1.2, weight: 5 }
+      - { key: cagr_revenue_5y, label: "CAGR receita 5a", bad: 0.05, good: 0.12, weight: 5, if_invalid: zero }
+      - { key: cagr_earnings_5y, label: "CAGR lucro 5a", bad: 0.05, good: 0.15, weight: 10, if_invalid: zero }
+      - { key: payout_5y, label: "Payout médio 5a", band: [0.0, 0.40, 0.95, 1.20], weight: 10, if_invalid: zero }
+      - { key: cash_conversion_5y, label: "FCO / lucro 5a", bad: 0.6, good: 1.0, weight: 10 }
+    price:
+      - { key: dy_5y, label: "DY médio 5a", bad: 0.04, good: 0.10, weight: 35 }
+      - { key: ev_ebit, label: "EV/EBIT", bad: 15, good: 7, weight: 25, if_invalid: zero }
+      - { key: pe, label: "P/L", bad: 20, good: 8, weight: 20, if_invalid: zero }
+      - { key: pb, label: "P/VP", bad: 2.5, good: 1.0, weight: 10 }
+      - { key: fcf_yield, label: "FCF yield", bad: 0.02, good: 0.10, weight: 10 }
+
+  CYCLICAL:
+    # Commodities (steel, mining, oil, pulp, petrochemicals, agriculture): multiples over 5-year averages.
+    # CAGR lucro has weight 0 here: the 5-year endpoints fall on different points of the cycle.
+    warning: "setor cíclico — múltiplos sobre lucro médio de 5 anos"
+    quality:
+      - { key: roe_5y, label: "ROE médio 5a", bad: 0.08, good: 0.20, weight: 20 }
+      - { key: roic, label: "ROIC", bad: 0.06, good: 0.16, weight: 10 }
+      - { key: net_margin_5y, label: "Margem líquida média 5a", bad: 0.03, good: 0.12, weight: 10 }
+      - { key: net_debt_ebitda, label: "Dívida líquida / EBITDA", bad: 2.5, good: 0.5, weight: 30, if_invalid: zero }
+      - { key: current_ratio, label: "Liquidez corrente", bad: 1.0, good: 1.8, weight: 10 }
+      - { key: cagr_revenue_5y, label: "CAGR receita 5a", bad: 0.05, good: 0.15, weight: 5, if_invalid: zero }
+      - { key: payout_5y, label: "Payout médio 5a", band: [0.0, 0.25, 0.80, 1.0], weight: 5, if_invalid: zero }
+      - { key: cash_conversion_5y, label: "FCO / lucro 5a", bad: 0.6, good: 1.0, weight: 10 }
+    price:
+      - { key: pe_norm, label: "P/L (lucro médio 5a)", bad: 15, good: 6, weight: 25, if_invalid: zero }
+      - { key: ev_ebit_norm, label: "EV/EBIT (EBIT médio 5a)", bad: 12, good: 5, weight: 25, if_invalid: zero }
+      - { key: dy_5y, label: "DY médio 5a", bad: 0.03, good: 0.10, weight: 30 }
+      - { key: pb, label: "P/VP", bad: 2.0, good: 0.8, weight: 20 }

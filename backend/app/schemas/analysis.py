@@ -43,8 +43,12 @@ class AnalysisOut(BaseModel):
     score_final: float | None
     score_quality: float | None
     score_price: float | None
+    score_price_fundamental: float | None  # before the technical component (F8) and the loss cap
+    score_technical: float | None
+    technical_weight: float
     quality_inconclusive: bool
     price_inconclusive: bool
+    stale: bool  # statements too old: scores inconclusive
     main_reason: str | None
     eliminatory: list[EliminatoryOut]
     indicators: list[IndicatorScoreOut]
@@ -53,6 +57,7 @@ class AnalysisOut(BaseModel):
     bazin_price: Number | None
     dy_5y: Number | None
     market_cap: Money | None
+    daily_liquidity: Money | None
     last_dfp: dt.date | None
     last_itr: dt.date | None
     received_on: dt.date | None
@@ -77,8 +82,12 @@ def analysis_out(ta) -> AnalysisOut:
         score_final=a.score_final,
         score_quality=a.score_quality,
         score_price=a.score_price,
+        score_price_fundamental=a.score_price_fundamental,
+        score_technical=a.score_technical,
+        technical_weight=a.technical_weight,
         quality_inconclusive=a.quality_inconclusive,
         price_inconclusive=a.price_inconclusive,
+        stale=a.stale,
         main_reason=a.main_reason,
         eliminatory=[EliminatoryOut.model_validate(c) for c in a.eliminatory],
         indicators=[IndicatorScoreOut.model_validate(i) for i in a.indicators],
@@ -87,6 +96,7 @@ def analysis_out(ta) -> AnalysisOut:
         bazin_price=r.value("bazin_price"),
         dy_5y=r.value("dy_5y"),
         market_cap=r.value("market_cap"),
+        daily_liquidity=r.value("daily_liquidity"),
         last_dfp=r.last_dfp,
         last_itr=r.last_itr,
         received_on=r.received_on,

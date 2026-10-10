@@ -205,7 +205,7 @@ export interface Analysis {
   name: string;
   cnpj: string;
   sector: string | null;
-  special_sector: "FINANCIAL" | "UTILITY" | null;
+  special_sector: "FINANCIAL" | "UTILITY" | "CYCLICAL" | null;
   price: Dec | null;
   price_date: string | null;
   day_change: Dec | null;
@@ -213,8 +213,12 @@ export interface Analysis {
   score_final: number | null;
   score_quality: number | null;
   score_price: number | null;
+  score_price_fundamental: number | null;
+  score_technical: number | null;
+  technical_weight: number;
   quality_inconclusive: boolean;
   price_inconclusive: boolean;
+  stale: boolean;
   main_reason: string | null;
   eliminatory: { id: string; label: string; rule: string; value_label: string | null; passed: boolean | null }[];
   indicators: {
@@ -234,6 +238,7 @@ export interface Analysis {
   bazin_price: Dec | null;
   dy_5y: Dec | null;
   market_cap: Dec | null;
+  daily_liquidity: Dec | null;
   last_dfp: string | null;
   last_itr: string | null;
   received_on: string | null;

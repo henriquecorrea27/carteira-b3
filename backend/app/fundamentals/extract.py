@@ -70,6 +70,8 @@ class Figures:
     net_income_controlling: Decimal | None = None
     d_and_a: Decimal | None = None
     dividends_paid: Decimal | None = None
+    operating_cash_flow: Decimal | None = None
+    capex: Decimal | None = None
     total_assets: Decimal | None = None
     current_assets: Decimal | None = None
     current_liabilities: Decimal | None = None
@@ -88,8 +90,19 @@ _DEBT = r"emprestimos e financiamentos"
 _LEASE = r"arrendamento"
 _DA = r"deprecia|exaust|amortizac"
 _DA_EXCLUDE = r"transac|emprestimo|financiamento|debenture|agio|captac|custo de emiss"
-_DIVIDENDS = r"dividend|juros sobre (o )?capital|\bjcp\b"
-_DIVIDENDS_EXCLUDE = r"nao controlador|recebid"
+# Also "Pagamento de Proventos" (B3), "Juros s/ o capital próprio" (ABC), "Pagamento e remuneração aos
+# acionistas" (Axia), "Distribuição de lucros"
+_DIVIDENDS = (
+    r"dividend|juros s(obre|/) ?(o )?capital|\bjcp\b|provento|remuneracao (paga )?aos acionistas"
+    r"|distribuicao de lucro|lucros distribuidos"
+)
+_DIVIDENDS_EXCLUDE = r"nao controlador|recebid|recebiment"
+# Capex lines of the investing activities (6.02): "Aquisição de imobilizado e intangível", "No Imobilizado",
+# "Adições ao Imobilizado", "Em ativos de contrato - infraestrutura…", "Aquisição e Desenv. de Softwares"
+_CAPEX = r"imobilizado|intangive|software|ativos? de contrato|infraestrutura"
+_CAPEX_EXCLUDE = (
+    r"alienac|venda|recebiment|baixa|resgate|desinvest|combinac|controlad|coligad|participac|integraliz"
+)
 
 
 def detect_template(bpa: Statement) -> str:
@@ -118,7 +131,8 @@ def extract(bpa: Statement, bpp: Statement, dre: Statement, dfc: Statement | Non
             for c in dre.children(net.code)
             if re.search(_CONTROLLING, c.text) and not re.search(_MINORITY, c.text)
         ]
-        fig.net_income_controlling = ctrl[0].value if ctrl else net.value
+        # Many filers leave the attribution lines at zero (Banco ABC 2022–2023): then it is all controlling
+        fig.net_income_controlling = ctrl[0].value if ctrl and ctrl[0].value != 0 else net.value
 
     basic = dre.children("3.99")
     first_class = dre.children(basic[0].code) if basic else []
@@ -171,7 +185,21 @@ def extract(bpa: Statement, bpp: Statement, dre: Statement, dfc: Statement | Non
     if fig.d_and_a is None and fig.template == "INDUSTRIAL":
         fig.missing.append("depreciação e amortização")
     fig.dividends_paid = dividends_paid(dfc)
+    operating = dfc.get("6.01", r"^caixa liquido")
+    fig.operating_cash_flow = operating.value if operating else None
+    fig.capex = capex(dfc)
     return fig
+
+
+def capex(dfc: Statement) -> Decimal:
+    """Cash spent on fixed, intangible and concession contract assets (positive amount). Only outflows count
+    ("Proventos da venda de imobilizado" is an inflow). Pure holdings have no such lines: zero capex."""
+    spent = [
+        c.value
+        for c in dfc.children("6.02")
+        if c.value < 0 and re.search(_CAPEX, c.text) and not re.search(_CAPEX_EXCLUDE, c.text)
+    ]
+    return -sum(spent, ZERO)
 
 
 def dividends_paid(dfc: Statement) -> Decimal:

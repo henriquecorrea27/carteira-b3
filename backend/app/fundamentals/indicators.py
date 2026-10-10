@@ -5,7 +5,6 @@ TTM = latest ITR year-to-date + latest DFP − same year-to-date of the previous
 four quarters, 4th quarter = DFP − 9-month ITR). Without a newer ITR, the DFP itself is the TTM."""
 
 import math
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -18,11 +17,7 @@ ZERO, ONE = Decimal(0), Decimal(1)
 TAX_ROIC = Decimal("0.34")
 BAZIN_YIELD = Decimal("0.06")
 GRAHAM = Decimal("22.5")
-
-FINANCIAL_SECTORS = (
-    r"bancos|seguradoras|intermediacao financeira|arrendamento mercantil|previdencia|capitalizacao"
-)
-UTILITY_SECTORS = r"energia eletrica|saneamento|agua e gas"
+EARNINGS_DROP = Decimal("0.75")  # earnings below 75% of the previous year's count as a drop
 
 
 class Period(Protocol):
@@ -37,6 +32,9 @@ class Period(Protocol):
     net_income_controlling: Decimal | None
     d_and_a: Decimal | None
     dividends_paid: Decimal | None
+    operating_cash_flow: Decimal | None
+    capex: Decimal | None
+    total_assets: Decimal | None
     current_assets: Decimal | None
     current_liabilities: Decimal | None
     cash: Decimal | None
@@ -52,11 +50,14 @@ class Indicator:
     value: Decimal | None
     unit: str  # pct (fraction) | x | brl | count
     note: str | None = None
+    # No value for an ECONOMIC reason (LPA ≤ 0, EBIT ≤ 0, final value ≤ 0, no profitable year), not for lack
+    # of data. Rules with `if_invalid: zero` score it as 0 instead of leaving it out (CLAUDE.md §5).
+    invalid: bool = False
 
 
 @dataclass
 class FundamentalsResult:
-    special_sector: str | None  # FINANCIAL | UTILITY | None
+    special_sector: str | None  # FINANCIAL | UTILITY | CYCLICAL | None (general), see app.rules.engine
     indicators: dict[str, Indicator]
     profitable_years: int  # E1: years with positive net income among the last 5 DFPs
     years_available: int
@@ -64,19 +65,13 @@ class FundamentalsResult:
     last_itr: date | None
     received_on: date | None
     notes: list[str] = field(default_factory=list)
+    template: str | None = None  # INDUSTRIAL | BANK (CVM chart of accounts)
+    issuer: str | None = None  # ticker root (PETR), for manual overrides in the rules
+    issuer_status: str | None = None  # CVM SIT_EMISSOR (rule E5)
+    as_of: date | None = None  # analysis date (staleness of the statements)
 
     def value(self, key: str) -> Decimal | None:
         return self.indicators[key].value
-
-
-def special_sector(sector: str | None, template: str | None) -> str | None:
-    text = (sector or "").lower()
-    text = text.translate(str.maketrans("áàâãéêíóôõúç", "aaaaeeiooouc"))
-    if template == "BANK" or re.search(FINANCIAL_SECTORS, text):
-        return "FINANCIAL"
-    if re.search(UTILITY_SECTORS, text):
-        return "UTILITY"
-    return None
 
 
 def _div(a: Decimal | None, b: Decimal | None) -> Decimal | None:
@@ -154,15 +149,20 @@ def compute(
     price: Decimal | None,
     class_prices: dict[str, Decimal],
     daily_liquidity: Decimal | None,
-    sector: str | None,
-    template: str | None,
+    special_sector: str | None = None,
+    template: str | None = None,
+    *,
+    issuer: str | None = None,
+    issuer_status: str | None = None,
+    b3_pays_dividends: bool | None = None,
+    as_of: date | None = None,
 ) -> FundamentalsResult:
     book = _Book(periods)
     notes: list[str] = []
     out: dict[str, Indicator] = {}
 
-    def add(key, label, value, unit, note=None):
-        out[key] = Indicator(key, label, value, unit, note)
+    def add(key, label, value, unit, note=None, invalid=False):
+        out[key] = Indicator(key, label, value, unit, note, invalid)
 
     ni_ttm, n1 = book.ttm("net_income_controlling")
     ebit_ttm, n2 = book.ttm("ebit")
@@ -220,56 +220,100 @@ def compute(
         None if len(margins) >= 3 else "receita indisponível",
     )
 
-    def cagr(metric: str):
+    def cagr(key: str, label: str, metric: str) -> None:
+        """Base ≤ 0 → N/A (no meaningful rate); final value ≤ 0 with a positive base → invalid (it shrank)."""
         if len(years) < 6:
-            return None, "menos de 6 DFPs"
+            return add(key, label, None, "pct", "menos de 6 DFPs")
         base, final = getattr(years[0], metric), getattr(years[-1], metric)
         if base is None or final is None:
-            return None, "dado indisponível"
-        if base <= 0 or final <= 0:
-            return None, "base ou valor final ≤ 0"
-        return Decimal(math.pow(float(final / base), 1 / 5)) - ONE, None
+            return add(key, label, None, "pct", "dado indisponível")
+        if base <= 0:
+            return add(key, label, None, "pct", "base ≤ 0")
+        if final <= 0:
+            return add(key, label, None, "pct", "valor final ≤ 0", invalid=True)
+        return add(key, label, Decimal(math.pow(float(final / base), 1 / 5)) - ONE, "pct")
 
-    v, n = cagr("net_income_controlling")
-    add("cagr_earnings_5y", "CAGR lucro 5a", v, "pct", n)
-    v, n = cagr("revenue")
-    add("cagr_revenue_5y", "CAGR receita 5a", v, "pct", n)
+    cagr("cagr_earnings_5y", "CAGR lucro 5a", "net_income_controlling")
+    cagr("cagr_revenue_5y", "CAGR receita 5a", "revenue")
+    cagr("cagr_book_5y", "CAGR patrimônio 5a", "equity_controlling")
 
-    payouts = [
-        y.dividends_paid / y.net_income_controlling
-        for y in last5
-        if y.dividends_paid is not None and y.net_income_controlling and y.net_income_controlling > 0
-    ]
+    # Earnings drops: years whose net income fell more than 25% (or turned into a loss) vs. the year before
+    drops = None
+    if len(years) == 6 and all(y.net_income_controlling is not None for y in years):
+        drops = sum(
+            1
+            for before, y in zip(years, years[1:], strict=False)
+            if before.net_income_controlling > 0
+            and y.net_income_controlling < before.net_income_controlling * EARNINGS_DROP
+        )
     add(
-        "payout_5y",
-        "Payout médio 5a",
-        _mean(payouts) if payouts else None,
-        "pct",
-        "dividendos e JCP pagos (fluxo de caixa) / lucro" if payouts else "sem anos com lucro",
+        "earnings_drops_5y",
+        "Quedas de lucro > 25% (5a)",
+        None if drops is None else Decimal(drops),
+        "count",
+        None if drops is not None else "menos de 6 DFPs",
     )
+
+    with_dividends = [
+        y for y in last5 if y.dividends_paid is not None and y.net_income_controlling is not None
+    ]
+    payouts = [
+        y.dividends_paid / y.net_income_controlling for y in with_dividends if y.net_income_controlling > 0
+    ]
+    if payouts:
+        add(
+            "payout_5y",
+            "Payout médio 5a",
+            _mean(payouts),
+            "pct",
+            "dividendos e JCP pagos (fluxo de caixa) / lucro",
+        )
+    elif with_dividends:
+        add("payout_5y", "Payout médio 5a", None, "pct", "sem anos com lucro", invalid=True)
+    else:
+        add("payout_5y", "Payout médio 5a", None, "pct", "dados indisponíveis")
+
+    # Earnings quality: operating cash flow / net income, summed over the last 5 years (both consolidated)
+    pairs = [
+        (y.operating_cash_flow, y.net_income if y.net_income is not None else y.net_income_controlling)
+        for y in last5
+        if y.operating_cash_flow is not None
+    ]
+    pairs = [(fco, ni) for fco, ni in pairs if ni is not None]
+    if len(pairs) < 3:
+        add("cash_conversion_5y", "FCO / lucro 5a", None, "x", "fluxo de caixa operacional indisponível")
+    elif sum(ni for _, ni in pairs) <= 0:
+        add("cash_conversion_5y", "FCO / lucro 5a", None, "x", "lucro acumulado ≤ 0", invalid=True)
+    else:
+        conversion = sum(fco for fco, _ in pairs) / sum(ni for _, ni in pairs)
+        add(
+            "cash_conversion_5y",
+            "FCO / lucro 5a",
+            conversion,
+            "x",
+            None if len(pairs) >= 5 else f"{len(pairs)} anos",
+        )
 
     # Balance sheet
     net_debt = None
     if bal and bal.gross_debt is not None and bal.cash is not None:
         net_debt = bal.gross_debt - bal.cash
     ebitda = ebit_ttm + da_ttm if ebit_ttm is not None and da_ttm is not None else None
-    nd_note = None
-    nd_ebitda = None
     if net_debt is None:
-        nd_note = "dívida ou caixa indisponível"
+        add("net_debt_ebitda", "Dívida líquida / EBITDA", None, "x", "dívida ou caixa indisponível")
     elif ebitda is None:
-        nd_note = "D&A não localizada no fluxo de caixa"
+        add("net_debt_ebitda", "Dívida líquida / EBITDA", None, "x", "D&A não localizada no fluxo de caixa")
     elif ebitda <= 0:
-        nd_note = "EBITDA negativo"
+        add("net_debt_ebitda", "Dívida líquida / EBITDA", None, "x", "EBITDA negativo", invalid=True)
     else:
-        nd_ebitda = net_debt / ebitda
-    add("net_debt_ebitda", "Dívida líquida / EBITDA", nd_ebitda, "x", nd_note)
+        add("net_debt_ebitda", "Dívida líquida / EBITDA", net_debt / ebitda, "x")
     add(
         "current_ratio",
         "Liquidez corrente",
         _div(bal.current_assets, bal.current_liabilities) if bal else None,
         "x",
     )
+    add("equity_to_assets", "PL / ativo total", _div(bal.equity, bal.total_assets) if bal else None, "pct")
 
     invested = None
     if bal and bal.equity is not None and bal.gross_debt is not None and bal.cash is not None:
@@ -285,13 +329,10 @@ def compute(
     vpa = _div(eq_now, outstanding)
     add("eps", "LPA (TTM)", lpa, "brl")
     add("bvps", "VPA", vpa, "brl")
-    add(
-        "pe",
-        "P/L",
-        _div(price, lpa) if lpa and lpa > 0 else None,
-        "x",
-        "LPA ≤ 0" if lpa is not None and lpa <= 0 else None,
-    )
+    if lpa is not None and lpa <= 0:
+        add("pe", "P/L", None, "x", "LPA ≤ 0", invalid=True)
+    else:
+        add("pe", "P/L", _div(price, lpa), "x")
     add("pb", "P/VP", _div(price, vpa) if vpa and vpa > 0 else None, "x")
 
     market_cap = None
@@ -302,10 +343,58 @@ def compute(
         if "ON" not in class_prices and shares.on > 0 or "PN" not in class_prices and shares.pn > 0:
             notes.append("uma das classes sem cotação: usado o preço da outra classe no valor de mercado")
     add("market_cap", "Valor de mercado", market_cap, "brl")
-    ev_ebit = None
-    if market_cap is not None and net_debt is not None and ebit_ttm and ebit_ttm > 0:
-        ev_ebit = (market_cap + net_debt) / ebit_ttm
-    add("ev_ebit", "EV/EBIT", ev_ebit, "x")
+
+    # EV = market cap + net debt + minority interests (the EBIT is consolidated, so the EV must be too)
+    ev = None
+    if market_cap is not None and net_debt is not None:
+        minority = ZERO
+        if bal.equity is not None and bal.equity_controlling is not None:
+            minority = bal.equity - bal.equity_controlling
+        ev = market_cap + net_debt + minority
+    if ev is not None and ebit_ttm is not None and ebit_ttm <= 0:
+        add("ev_ebit", "EV/EBIT", None, "x", "EBIT ≤ 0", invalid=True)
+    else:
+        add("ev_ebit", "EV/EBIT", _div(ev, ebit_ttm), "x")
+
+    # Free cash flow yield: (operating cash flow − capex) TTM / market cap
+    fco_ttm, _ = book.ttm("operating_cash_flow")
+    capex_ttm, _ = book.ttm("capex")
+    fcf = fco_ttm - (capex_ttm or ZERO) if fco_ttm is not None else None
+    add(
+        "fcf_yield",
+        "FCF yield",
+        _div(fcf, market_cap) if market_cap and market_cap > 0 else None,
+        "pct",
+        None if fcf is not None else "fluxo de caixa operacional indisponível",
+    )
+
+    # Normalized multiples (cyclicals): 5-year average earnings, EBIT and EBITDA instead of the TTM
+    enough = len(last5) >= 3
+    avg_ni = _mean([y.net_income_controlling for y in last5 if y.net_income_controlling is not None])
+    avg_ebit = _mean([y.ebit for y in last5 if y.ebit is not None])
+    avg_ebitda = _mean([y.ebit + y.d_and_a for y in last5 if y.ebit is not None and y.d_and_a is not None])
+    lpa_norm = _div(avg_ni, outstanding) if enough else None
+    if lpa_norm is not None and lpa_norm <= 0:
+        add("pe_norm", "P/L (lucro médio 5a)", None, "x", "lucro médio de 5 anos ≤ 0", invalid=True)
+    else:
+        add(
+            "pe_norm",
+            "P/L (lucro médio 5a)",
+            _div(price, lpa_norm),
+            "x",
+            None if enough else "menos de 3 DFPs",
+        )
+    if enough and ev is not None and avg_ebit is not None and avg_ebit <= 0:
+        add("ev_ebit_norm", "EV/EBIT (EBIT médio 5a)", None, "x", "EBIT médio de 5 anos ≤ 0", invalid=True)
+    else:
+        add("ev_ebit_norm", "EV/EBIT (EBIT médio 5a)", _div(ev, avg_ebit) if enough else None, "x")
+    label = "Dívida líquida / EBITDA médio 5a"
+    if not enough or net_debt is None or avg_ebitda is None:
+        add("net_debt_ebitda_norm", label, None, "x", "dados indisponíveis")
+    elif avg_ebitda <= 0:
+        add("net_debt_ebitda_norm", label, None, "x", "EBITDA médio negativo", invalid=True)
+    else:
+        add("net_debt_ebitda_norm", label, net_debt / avg_ebitda, "x")
 
     graham = None
     if lpa and vpa and lpa > 0 and vpa > 0:
@@ -316,18 +405,20 @@ def compute(
         "Margem de segurança Graham",
         _div(graham - price, price) if graham and price else None,
         "pct",
+        None if graham else "LPA ou VPA ≤ 0",
     )
 
     dps = [y.dividends_paid / outstanding for y in last5 if y.dividends_paid is not None and outstanding]
     avg_dps = _mean(dps)
-    add(
-        "dps_5y",
-        "Proventos por ação médios 5a",
-        avg_dps,
-        "brl",
-        "dividendos e JCP pagos (fluxo de caixa CVM) ÷ ações atuais" if dps else None,
-    )
-    add("dy_5y", "DY médio 5a", _div(avg_dps, price), "pct")
+    dps_note = "dividendos e JCP pagos (fluxo de caixa CVM) ÷ ações atuais" if dps else None
+    if avg_dps == 0 and b3_pays_dividends:
+        # Nothing in the CVM cash flows, but the B3 lists recent payments: an account we do not recognize
+        avg_dps, dps_note = None, "a CVM não mostra proventos pagos, mas a B3 sim: conferir"
+        notes.append(
+            "DY sem dados: proventos não localizados no fluxo de caixa da CVM, mas a B3 mostra pagamentos"
+        )
+    add("dps_5y", "Proventos por ação médios 5a", avg_dps, "brl", dps_note)
+    add("dy_5y", "DY médio 5a", _div(avg_dps, price), "pct", dps_note if avg_dps is None and dps else None)
     add("bazin_price", "Preço teto Bazin", avg_dps / BAZIN_YIELD if avg_dps is not None else None, "brl")
     add("daily_liquidity", "Liquidez média diária (2 meses)", daily_liquidity, "brl")
 
@@ -335,7 +426,7 @@ def compute(
         1 for y in last5 if y.net_income_controlling is not None and y.net_income_controlling > 0
     )
     return FundamentalsResult(
-        special_sector=special_sector(sector, template),
+        special_sector=special_sector,
         indicators=out,
         profitable_years=profitable,
         years_available=len(last5),
@@ -343,4 +434,8 @@ def compute(
         last_itr=book.last_quarter.period_end if book.last_quarter else None,
         received_on=(book.last_quarter or book.last_annual).received_on if bal else None,
         notes=notes,
+        template=template,
+        issuer=issuer,
+        issuer_status=issuer_status,
+        as_of=as_of,
     )

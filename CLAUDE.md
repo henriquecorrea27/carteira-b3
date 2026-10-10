@@ -256,9 +256,16 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 - **DY médio 5a e Bazin:** a fonte da seção 3.9 (B3) só tem ~12 meses de proventos, então os proventos por ação
   de 5 anos = dividendos + JCP pagos (DFC da controladora) ÷ ações atuais.
 - TTM = acumulado do último ITR + último DFP − mesmo acumulado do ano anterior.
-- Setor especial: FINANCIAL (modelo de banco ou setor CVM de bancos/seguradoras/intermediação financeira,
-  inclusive holdings desses setores) e UTILITY (energia elétrica, saneamento, água e gás).
+- Setor especial (FINANCIAL, UTILITY, CYCLICAL): classificado pelas regras do `stocks.yaml` (seção 5.3).
 - Ativos da carteira que são ações listadas recebem o setor da CVM e a classe STOCK (corrige units "11").
+- **Fluxo de caixa (v2):** FCO = conta 6.01 ("Caixa Líquido Atividades Operacionais"); capex = soma das saídas em 6.02
+  cuja descrição cita imobilizado, intangível, software, ativos de contrato ou infraestrutura (exclui alienação, venda,
+  aquisição de controladas). Validado em arquivos reais (Petrobras, Vale, Ambev, WEG, Cemig, Equatorial, B3…).
+- **Proventos pagos:** além de "dividendos" e "JCP", aceita "Pagamento de Proventos" (B3), "Juros s/ o capital
+  próprio" (ABC), "Pagamento e remuneração aos acionistas" (Axia) e "Distribuição de lucros". Se a CVM somar zero mas
+  a B3 listar proventos nos últimos ~12 meses (`companies.b3_pays_dividends`), o DY vira N/A com aviso.
+- Linha "atribuído aos controladores" preenchida com zero (comum em bancos) → lucro dos controladores = lucro total.
+- Situação do emissor (`companies.issuer_status`) vem do `SIT_EMISSOR` do cadastro (regra E5).
 
 ### 4.2 Definição dos indicadores
 | Indicador | Fórmula |
@@ -273,76 +280,104 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 | Payout | (Dividendos + JCP) / Lucro líquido, média 5 anos |
 | P/L | Preço / LPA TTM (só se LPA > 0) |
 | P/VP | Preço / VPA |
-| EV/EBIT | (Valor de mercado + dívida líquida) / EBIT TTM |
+| EV/EBIT | (Valor de mercado + dívida líquida + participação dos minoritários) / EBIT TTM |
 | Valor de mercado | Σ (ações de cada classe, excluindo tesouraria × preço da classe) |
 | Preço justo Graham | √(22,5 × LPA × VPA). LPA ou VPA ≤ 0 → N/A |
 | Margem de segurança Graham | (preço justo − preço) / preço |
 | DY médio 5a | Proventos brutos por ação médios dos últimos 5 anos / preço atual |
 | Preço teto Bazin | Proventos por ação médios 5a / 0,06 (exibir na tela) |
 | Liquidez diária | Média do volume financeiro (preço × volume) dos últimos 2 meses |
+| FCO / lucro 5a | Σ fluxo de caixa operacional (DFC 6.01) / Σ lucro líquido consolidado, últimos 5 DFPs (mín. 3) |
+| FCF yield | (FCO − capex) TTM / valor de mercado. Capex = saídas de imobilizado, intangível e ativos de contrato (DFC 6.02) |
+| Quedas de lucro 5a | Nº de anos (em 5) com lucro < 75% do ano anterior (ou prejuízo após lucro); exige 6 DFPs |
+| CAGR do patrimônio | Como o CAGR do lucro, sobre o PL dos controladores |
+| PL / ativo total | PL / ativo total do último balanço (bancos) |
+| Múltiplos normalizados | P/L sobre o lucro médio de 5a; EV/EBIT sobre o EBIT médio de 5a; Dív. líq./EBITDA médio de 5a (cíclicas) |
 
 ---
 
-## 5. Motor de Regras — ⚠️ REGRAS EM AVALIAÇÃO
+## 5. Motor de Regras — v2 (pesos por setor)
 
-> **Estado atual: TODOS OS PESOS SÃO IGUAIS.** O usuário vai avaliar mais à frente quais indicadores pesam mais e decidir os pesos. **Não alterar pesos, faixas ou limites sem decisão explícita do usuário.**
-> A implementação lê tudo de `rules_config/stocks.yaml`. Qualquer mudança aprovada deve ser feita no YAML **e** nesta seção.
-> A análise gráfica (F8) vai entrar como componente adicional da nota de Preço, com peso próprio.
+> Pesos, faixas e travas propostos pelo agente `analista-investimentos` (`.claude/agents/`) e **aprovados pelo
+> usuário em 10/10/2026**. **Não alterar pesos, faixas ou limites sem decisão explícita do usuário.**
+> A implementação lê tudo de `rules_config/stocks.yaml`. Qualquer mudança aprovada deve ser feita no YAML **e** nesta seção
+> (e no teste `test_approved_weights_v2`).
+> A análise gráfica (F8) entra como componente da nota de Preço, com peso `w` definido pelo usuário (seção 5.6).
+> **Revisão:** 30/04/2027 (após a temporada de DFP 2026), ou antes se a Selic sair de 11–17%, o IPCA 12m passar de 6%,
+> mudar a tributação de dividendos/JCP, mudar o layout da CVM ou mais de 10% da carteira ficar inconclusiva.
 
 ### 5.1 Pontuação gradual
 - Cada indicador tem faixa **"ruim"** e **"ótimo"**. Pontuação = interpolação linear entre as duas, limitada a [0, 1], × peso.
-- Nota = soma dos pontos obtidos / soma dos pesos avaliados × 100.
+- Nota = soma dos pontos obtidos / soma dos pesos avaliados × 100. Cada grupo (Qualidade, Preço) soma 100 em cada setor.
 - Status exibido: ✅ ≥ 70% dos pontos · ⚠️ 30–70% · ❌ < 30% · ➖ sem dados.
 - **Indicador sem dados (N/A)** sai do denominador e aparece como "sem dados". Se mais de 30% do peso de uma nota estiver N/A → nota marcada **"inconclusiva"** e decisão = AGUARDAR.
+- **Inválido ≠ ausente:** P/L com LPA ≤ 0, EV/EBIT com EBIT ≤ 0, CAGR com valor final ≤ 0 (base > 0), Dív/EBITDA com
+  EBITDA ≤ 0 e payout sem ano de lucro valem **0 ponto (❌)** e ficam no denominador (`if_invalid: zero` no YAML).
+  CAGR com base ≤ 0 continua N/A.
+- **Valor implausível** (P/L < 1,5, P/VP < 0,1, DY > 25%, EV/EBIT entre 0 e 0,5) → N/A com aviso
+  "valor implausível — conferir nº de ações" (típico de número de ações em escala errada).
+- **Peso 0** = só exibido (margem de Graham, que é P/L × P/VP de novo).
+- **Travas:** eliminatório reprovado → nota final ≤ 30; LPA TTM ≤ 0 → nota de Preço ≤ 40 (nunca COMPRAR).
+- **Dados defasados:** último balanço com mais de 8 meses, ou sem DFP do último ano após 15/05 → as duas notas ficam
+  inconclusivas (AGUARDAR) com aviso.
+- Regra cujo indicador o motor não calcula é ignorada (os pesos se reponderam), nunca contada como N/A.
 
 ### 5.2 Camada 1 — Eliminatórios (falhou em qualquer um → EVITAR)
 | ID | Regra | Limite |
 |---|---|---|
 | E1 | Lucro líquido positivo nos últimos 5 anos | ≥ 4 de 5 anos |
 | E2 | Patrimônio líquido | > 0 |
-| E3 | Dívida líquida / EBITDA | ≤ 3,5 (utilities: ≤ 4,5) |
+| E3 | Dívida líquida / EBITDA (EBITDA ≤ 0 reprova) | ≤ 3,5 (utility ≤ 4,5; cíclica ≤ 3,0 sobre o EBITDA médio de 5 anos) |
 | E4 | Liquidez média diária | ≥ R$ 2 milhões |
+| E5 | Emissor sem recuperação judicial/extrajudicial, falência, liquidação ou paralisação | `SIT_EMISSOR` do cadastro da CVM + lista manual por ticker (AMBP: RJ desde 10/2025, a CVM ainda mostra "fase operacional") |
 
-### 5.3 Camada 2 — Nota de Qualidade (0–100) — pesos iguais
-| Indicador | Ruim → Ótimo | Peso |
-|---|---|---|
-| ROE médio 5a | 8% → 20% | 12,5 |
-| ROIC | 6% → 15% | 12,5 |
-| Margem líquida média | 5% → 15% | 12,5 |
-| CAGR lucro 5a | 0% → 12% | 12,5 |
-| Dívida líquida / EBITDA | 3,0 → 0,5 (caixa líquido = ótimo) | 12,5 |
-| CAGR receita 5a | 0% → 10% | 12,5 |
-| Liquidez corrente | 0,8 → 1,5 | 12,5 |
-| Payout médio | ótimo dentro de 25–80%; zero fora de 0–100% | 12,5 |
+### 5.3 Classificação de setor
+Pelo `SETOR_ATIV` da CVM (sem acento; holdings "Emp. Adm. Part. - <setor>" seguem o setor principal). A primeira que casar vence:
+1. **FINANCEIRO:** plano de contas de banco, ou bancos, seguradoras, intermediação financeira, arrendamento mercantil,
+   previdência, capitalização, crédito imobiliário.
+2. **UTILITY:** energia elétrica, saneamento, água e gás.
+3. **CÍCLICA:** metalurgia e siderurgia, extração mineral, petróleo e gás, papel e celulose, petroquímicos, agricultura,
+   reflorestamento.
+4. **GERAL:** o resto. Override manual por raiz de ticker no YAML (AMBP → GERAL; a Ambipar está cadastrada como saneamento).
 
-### 5.4 Camada 3 — Nota de Preço (0–100) — pesos iguais
-| Indicador | Ruim → Ótimo | Peso |
-|---|---|---|
-| Margem de segurança Graham | −20% → +30% | 20 |
-| P/L | 25 → 8 | 20 |
-| EV/EBIT | 15 → 6 | 20 |
-| DY médio 5a | 2% → 8% | 20 |
-| P/VP | 3,0 → 1,0 | 20 |
+### 5.4 Pesos e faixas (ruim → ótimo)
+**GERAL — Qualidade:** ROIC 20 (6% → 16%) · ROE médio 5a 10 (8% → 20%) · margem líquida 5a 5 (5% → 15%) ·
+Dív. líq./EBITDA 20 (3,0 → 0,5) · liquidez corrente 5 (0,8 → 1,5) · CAGR receita 5a 10 (5% → 15%) ·
+CAGR lucro 5a 10 (5% → 18%) · FCO/lucro 5a 10 (0,6 → 1,0) · quedas de lucro > 25% em 5a 5 (3 → 0) ·
+payout 5a 5 (ótimo 25–80%, zero fora de 0–100%).
+**GERAL — Preço:** EV/EBIT 30 (15 → 6) · P/L 20 (20 → 7) · DY médio 5a 20 (2% → 8%) · P/VP 10 (3,0 → 1,0) ·
+FCF yield 20 (2% → 10%) · margem de Graham 0 (só exibida).
+
+**FINANCEIRO** (aviso "análise parcial"; eliminatórios E1, E2, E4, E5) — Qualidade: ROE 5a 45 (10% → 20%) ·
+CAGR lucro 20 (5% → 15%) · CAGR do patrimônio 15 (4% → 12%) · PL/ativo total 10 (6% → 10%, **só bancos**) ·
+payout 10 (ótimo 25–90%, zero fora de 0–110%). Preço: P/L 40 (15 → 6) · DY 40 (3% → 9%) · P/VP 20 (2,5 → 0,9).
+
+**UTILITY** — Qualidade: ROIC 20 (5% → 12%) · ROE 5a 15 (8% → 18%) · Dív./EBITDA 25 (4,5 → 2,0) ·
+liquidez corrente 5 (0,6 → 1,2) · CAGR receita 5 (5% → 12%) · CAGR lucro 10 (5% → 15%) · payout 10 (ótimo 40–95%,
+zero fora de 0–120%) · FCO/lucro 10. Preço: DY 35 (4% → 10%) · EV/EBIT 25 (15 → 7) · P/L 20 (20 → 8) ·
+P/VP 10 (2,5 → 1,0) · FCF yield 10 (2% → 10%).
+
+**CÍCLICA** (aviso "setor cíclico") — Qualidade: ROE 5a 20 (8% → 20%) · ROIC 10 (6% → 16%) · margem 10 (3% → 12%) ·
+Dív./EBITDA 30 (2,5 → 0,5) · liquidez corrente 10 (1,0 → 1,8) · CAGR receita 5 · payout 5 · FCO/lucro 10
+(CAGR do lucro fora: as pontas de 5 anos caem em pontos diferentes do ciclo). Preço: P/L sobre o lucro médio de 5a 25
+(15 → 6) · EV/EBIT sobre o EBIT médio de 5a 25 (12 → 5) · DY 30 (3% → 10%) · P/VP 20 (2,0 → 0,8).
 
 ### 5.5 Decisão
 | Qualidade | Preço | Decisão |
 |---|---|---|
-| Falhou eliminatório | qualquer | **EVITAR** |
+| Falhou eliminatório | qualquer | **EVITAR** (nota final limitada a 30) |
 | ≥ 70 | ≥ 60 | **COMPRAR** |
 | ≥ 70 | < 60 | **AGUARDAR** (boa empresa, preço caro) |
 | 50–69 | qualquer | **AGUARDAR** (observar) |
 | < 50 | qualquer | **EVITAR** |
 
-**Nota final exibida:** 0,5 × Qualidade + 0,5 × Preço (peso igual; em avaliação).
+**Nota final exibida:** 0,6 × Qualidade + 0,4 × Preço (só ordenação; a decisão usa a tabela acima).
+Desempate nas listas: nota final → Qualidade → liquidez.
 
-### 5.6 Setores com regras especiais
-- **Bancos e seguradoras:** não usar EBITDA, dívida líquida, ROIC, EV/EBIT nem liquidez corrente. Conjunto reduzido, com pesos iguais:
-  - Qualidade: ROE, CAGR lucro, payout.
-  - Preço: P/L, P/VP, DY.
-  - Eliminatórios: E1, E2, E4.
-  - Exibir aviso **"análise parcial — setor financeiro"**.
-- **Utilities** (energia, saneamento): E3 com limite 4,5.
-- FIIs, ETFs e BDRs: **sem regras por enquanto** (só aparecem na carteira).
+### 5.6 Componente técnico (F8)
+Preço = (1 − w) × Preço fundamentalista + w × nota técnica (0–100). `technical.enabled: false` e `weight: null` até o
+usuário especificar a F8 (sugestão do analista: w entre 0,10 e 0,25). Enquanto não existir, w = 0 e nunca conta como
+N/A. A parte técnica nunca anula um eliminatório. FIIs, ETFs e BDRs: **sem regras por enquanto**.
 
 ### 5.7 Saída obrigatória da análise
 Para cada ativo pesquisado:
@@ -359,12 +394,16 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 
 ### 5.8 Implementação (F6, `app/rules/`)
 - `engine.py` é puro e não tem nenhum número próprio: tudo vem de `rules_config/stocks.yaml` (pesos, faixas,
-  limites, tabela de decisão, setores especiais). Um teste trava os pesos iguais enquanto estiverem em avaliação.
+  limites, tabela de decisão, classificação de setores, travas). `test_approved_weights_v2` trava os pesos aprovados.
+- Nos setores, uma lista de chaves filtra as regras gerais; uma lista de regras (dicts) as substitui.
 - Payout usa faixa "trapézio" (`band: [0, 0,25, 0,80, 1,0]`): 0 fora de 0–100%, ótimo entre 25–80%, linear entre.
-- Eliminatório sem dados (N/A) **não elimina** (aparece ➖); exceção: E3 com EBITDA negativo conta como reprovado.
+- `Indicator.invalid` marca valor ausente por razão econômica (prejuízo, EBIT ≤ 0…); só vira 0 ponto onde a regra tem
+  `if_invalid: zero`. `applies_to_template: BANK` aplica a regra só ao plano de contas de banco.
+- Eliminatório sem dados (N/A) **não elimina** (aparece ➖); exceção: E3 com EBITDA ≤ 0 conta como reprovado.
   Com menos de 5 DFPs (mín. 3), o E1 tolera o mesmo número de anos com prejuízo (1).
+- `evaluate(..., technical=nota)` já combina a nota técnica quando habilitada no YAML (F8).
 - Motivo principal: eliminatório reprovado; senão, para COMPRAR o indicador que mais pontuou e para os demais o que
-  mais perdeu pontos (mostrado na carteira, na Análise e usado no Discord).
+  mais perdeu pontos (mostrado na carteira, na Análise e usado no Discord). Indicadores de peso 0 nunca são o motivo.
 - Snapshot diário por ticker (`analysis_snapshots`, 1 linha por ticker/dia, com a análise completa em JSON);
   `decision_changes(dia)` compara com o snapshot anterior. Gerado ao abrir a Análise, pelo botão "Atualizar preços"
   (cotações → eventos → reanálise da carteira) e pelo job `app.jobs.daily_analysis`.
@@ -435,7 +474,7 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 ---
 
 ## 8. Radar (não implementar sem pedido explícito)
-- **Definição dos pesos** pelo usuário (hoje todos iguais) e editor de pesos na UI.
+- Editor de pesos na UI (os pesos v2 foram definidos em 10/10/2026).
 - **Backtest** das regras com dados históricos da CVM (atenção a overfitting).
 - Regras para FIIs (P/VP, DY, vacância — dados de informes da CVM).
 - Aprimoramentos das notificações (alertas intradiários, watchlist fora da carteira, preço-alvo).
@@ -447,6 +486,6 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 
 ## 9. Decisões pendentes do usuário
 - [x] Exemplos reais dos extratos B3 recebidos e layout documentado (originais não vão para o git).
-- [ ] Criar o **webhook do Discord** e colocar a URL no `.env`.
-- [ ] Pesos definitivos das regras (seção 5).
+- [x] Criar o **webhook do Discord** e colocar a URL no `.env`.
+- [x] Pesos das regras (seção 5, v2 aprovada em 10/10/2026; revisão em 30/04/2027).
 - [ ] Especificação da análise gráfica (F8).

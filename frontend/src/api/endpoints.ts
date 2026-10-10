@@ -287,13 +287,17 @@ function toAnalysis(a: W.Analysis): AssetAnalysis {
     score_price: a.score_price,
     quality_inconclusive: a.quality_inconclusive,
     price_inconclusive: a.price_inconclusive,
+    stale: a.stale,
+    score_price_fundamental: a.score_price_fundamental,
+    score_technical: a.score_technical,
+    technical_weight: a.technical_weight,
     eliminatory: a.eliminatory,
     indicators: a.indicators.map((i) => ({
       key: i.key,
       label: i.label,
       group: i.group,
       value: i.unit === "pct" ? toPct(i.value) : i.value,
-      unit: i.unit === "count" ? "ratio" : i.unit,
+      unit: i.unit,
       range_label: i.range_label,
       points: i.points === null ? null : String(i.points),
       max_points: String(i.weight),
@@ -305,7 +309,7 @@ function toAnalysis(a: W.Analysis): AssetAnalysis {
     bazin_ceiling: a.bazin_price,
     dy_5y_pct: toPct(a.dy_5y),
     warnings: a.warnings
-      .filter((w) => !w.startsWith("análise parcial"))
+      .filter((w) => !w.startsWith("análise parcial") && !w.startsWith("setor cíclico"))
       .map((w) => ({ source: "Análise", message: w, last_success_at: null })),
   };
 }

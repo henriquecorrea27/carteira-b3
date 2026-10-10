@@ -183,7 +183,7 @@ export interface AssetSearchResult {
 }
 
 export type IndicatorStatus = "GOOD" | "MID" | "BAD" | "NA";
-export type IndicatorUnit = "pct" | "x" | "brl" | "ratio";
+export type IndicatorUnit = "pct" | "x" | "brl" | "ratio" | "count";
 
 export interface Indicator {
   key: string;
@@ -199,6 +199,8 @@ export interface Indicator {
   note: string | null;
 }
 
+export type SpecialSector = "FINANCIAL" | "UTILITY" | "CYCLICAL";
+
 export interface EliminatoryCheck {
   id: string;
   label: string;
@@ -211,7 +213,7 @@ export interface AssetAnalysis {
   ticker: string;
   name: string;
   sector: string | null;
-  special_sector: "FINANCIAL" | "UTILITY" | null;
+  special_sector: SpecialSector | null;
   asset_class: AssetClass;
   price: Decimal | null;
   price_date: ISODate | null;
@@ -224,6 +226,12 @@ export interface AssetAnalysis {
   score_price: number | null;
   quality_inconclusive: boolean;
   price_inconclusive: boolean;
+  /** Statements too old: both scores inconclusive. */
+  stale: boolean;
+  /** Price score before the technical component (F8) and the loss cap. */
+  score_price_fundamental: number | null;
+  score_technical: number | null;
+  technical_weight: number;
   eliminatory: EliminatoryCheck[];
   indicators: Indicator[];
   graham_fair_price: Decimal | null;

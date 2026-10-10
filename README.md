@@ -112,6 +112,14 @@ cd frontend && npm run test
 
 Valores monetários e quantidades trafegam como **string decimal** (nunca float).
 
+## Regras de análise (v2)
+
+As notas seguem `backend/rules_config/stocks.yaml` (detalhes no `CLAUDE.md` §5): pesos próprios por setor (geral,
+financeiro, utility e cíclico), indicador inválido vale zero (ex.: P/L com prejuízo), checagem de valores implausíveis,
+eliminatórios E1–E5 (E5 = recuperação judicial/falência), nota final 0,6 × Qualidade + 0,4 × Preço e espaço para a
+nota técnica da F8. Depois de atualizar o código, rodar `uv run alembic upgrade head` e
+`uv run python -m app.jobs.ingest_cvm` (recalcula fluxo de caixa e capex a partir dos arquivos já baixados).
+
 ## Privacidade
 
 Extratos reais, prints e o `.env` nunca vão para o repositório (ver `.gitignore`). As fixtures de teste da B3

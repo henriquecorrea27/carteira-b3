@@ -4,7 +4,7 @@ import logging
 import re
 import zipfile
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -23,11 +23,13 @@ from app.market_data.service import record_status
 from app.models import Asset, Company, CompanyTicker, FundamentalPeriod, PriceHistory
 from app.portfolio.tickers import InvalidTickerError, normalize_ticker
 from app.portfolio.types import AssetClass
+from app.rules.engine import classify_sector
 
 log = logging.getLogger(__name__)
 SOURCE_STATUS = "cvm"
 _FIGURE_COLUMNS = (
     "revenue", "ebit", "net_income", "net_income_controlling", "d_and_a", "dividends_paid",
+    "operating_cash_flow", "capex",
     "total_assets", "current_assets", "current_liabilities", "cash", "gross_debt", "leases",
     "equity", "equity_controlling", "eps",
 )  # fmt: skip
@@ -89,17 +91,28 @@ def ingest(
 
     registry = _read_csv(raw / "cad_cia_aberta.csv")
     names = dict(zip(tickers["CNPJ_Companhia"], tickers["Nome_Empresarial"], strict=False))
-    sectors: dict[str, tuple[str, str | None]] = {}
+    sectors: dict[str, tuple[str, str | None, str | None]] = {}
     if registry is not None:
         active = registry[registry["SIT"] == "ATIVO"]
         for r in active.itertuples():
             sectors.setdefault(
-                r.CNPJ_CIA, (r.CD_CVM, r.SETOR_ATIV if isinstance(r.SETOR_ATIV, str) else None)
+                r.CNPJ_CIA,
+                (
+                    r.CD_CVM,
+                    r.SETOR_ATIV if isinstance(r.SETOR_ATIV, str) else None,
+                    r.SIT_EMISSOR if isinstance(r.SIT_EMISSOR, str) else None,
+                ),
             )
 
     for cnpj in listed:
-        cd_cvm, sector = sectors.get(cnpj, (None, None))
-        stmt = insert(Company).values(cnpj=cnpj, cd_cvm=cd_cvm, name=names.get(cnpj, cnpj), sector_cvm=sector)
+        cd_cvm, sector, issuer_status = sectors.get(cnpj, (None, None, None))
+        stmt = insert(Company).values(
+            cnpj=cnpj,
+            cd_cvm=cd_cvm,
+            name=names.get(cnpj, cnpj),
+            sector_cvm=sector,
+            issuer_status=issuer_status,
+        )
         session.execute(
             stmt.on_conflict_do_update(
                 index_elements=["cnpj"],
@@ -107,6 +120,7 @@ def ingest(
                     "cd_cvm": stmt.excluded.cd_cvm,
                     "name": stmt.excluded.name,
                     "sector_cvm": stmt.excluded.sector_cvm,
+                    "issuer_status": stmt.excluded.issuer_status,
                 },
             )
         )
@@ -255,21 +269,39 @@ class TickerFundamentals:
 
 
 def _refresh_shares(session: Session, company: Company, issuer: str, source, today: date) -> None:
+    """Share counts and the "B3 lists cash dividends" flag, from the B3 listed-company data (weekly)."""
     fresh = (
         company.shares_source == "B3"
         and company.shares_as_of
         and today - company.shares_as_of < SHARES_MAX_AGE
+        and company.b3_pays_dividends is not None
     )
     if fresh or source is None:
         return
     try:
-        count = from_b3(source.supplement(issuer), _stored_shares(company), today)
+        payload = source.supplement(issuer)
     except CorporateEventsError as err:
         log.warning("B3 share counts for %s failed: %s", issuer, err)
         return
+    company.b3_pays_dividends = _pays_dividends(payload, today)
+    count = from_b3(payload, _stored_shares(company), today)
     if count is not None:
         _store_shares(company, count)
-        session.commit()
+    session.commit()
+
+
+def _pays_dividends(payload: list[dict], today: date) -> bool:
+    """Any cash dividend with a record date in the last ~13 months (the B3 lists about 12 months)."""
+    since = today - timedelta(days=400)
+    for company in payload or []:
+        for item in company.get("cashDividends") or []:
+            try:
+                record = datetime.strptime(item.get("lastDatePrior") or "", "%d/%m/%Y").date()
+            except ValueError:
+                continue
+            if record >= since:
+                return True
+    return False
 
 
 def fetch_range(
@@ -397,8 +429,12 @@ def fundamentals_for(
         price,
         class_prices,
         _liquidity(session, ticker, today),
-        company.sector_cvm,
+        classify_sector(company.sector_cvm, company.template, ticker),
         company.template,
+        issuer=ticker[:4],
+        issuer_status=company.issuer_status,
+        b3_pays_dividends=company.b3_pays_dividends,
+        as_of=today,
     )
     if link.share_class == "UNIT":
         result.notes.append(f"unit ({link.unit_composition}): indicadores calculados por ação")

@@ -432,6 +432,10 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
     fundamentals_ref: "ITR 2T26 · DFP 2025",
     fundamentals_date: "2026-06-30",
     warnings: [],
+    stale: false,
+    score_price_fundamental: null,
+    score_technical: null,
+    technical_weight: 0,
   };
   if (known.asset_class !== "STOCK") {
     return {
@@ -549,7 +553,7 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
     decision,
     score_quality: sq,
     score_price: sp,
-    score_final: sq !== null && sp !== null ? Math.round(0.5 * sq + 0.5 * sp) : null,
+    score_final: sq !== null && sp !== null ? Math.round(0.6 * sq + 0.4 * sp) : null,
     quality_inconclusive: q.inconclusive,
     price_inconclusive: p.inconclusive,
     eliminatory,

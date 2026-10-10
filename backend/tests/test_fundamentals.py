@@ -11,9 +11,10 @@ import pytest
 
 from app.fundamentals import service
 from app.fundamentals.cvm_parser import CapitalComposition, parse_capital, parse_document
-from app.fundamentals.indicators import compute, special_sector
+from app.fundamentals.indicators import compute
 from app.fundamentals.shares import ShareCount, from_b3, from_cvm
 from app.market_data.base import DailyBar
+from app.rules.engine import classify_sector
 
 RAW = Path(__file__).parent / "fixtures" / "cvm" / "raw"
 B3 = Path(__file__).parent / "fixtures" / "b3_events"
@@ -49,6 +50,43 @@ def test_bank_template_uses_its_own_accounts():
     assert f.equity_controlling == D("189207675000")  # 2.07.01
     assert f.current_assets is None and f.gross_debt is None
     assert f.net_income_controlling is not None
+
+
+def test_cash_flow_operations_and_capex():
+    (p,) = periods_of(CEMIG, "dfp_cia_aberta_2025.zip", "DFP")
+    f = p.figures
+    assert f.operating_cash_flow == D("4076534000")  # 6.01 Caixa Líquido Atividades Operacionais
+    # Capex = No Imobilizado 699.182 + No Intangível 378.608 + Em ativos de contrato 5.386.242 (thousands);
+    # "Alienação de ativos imobilizados e intangíveis" (an inflow) is not capex
+    assert f.capex == D("6464032000")
+    assert f.dividends_paid == D("3966145000")
+    assert f.total_assets == D("67028076000")
+
+
+def test_dividend_lines_with_other_names():
+    from app.fundamentals.extract import Account, Statement, dividends_paid
+
+    def dfc(*lines):
+        return Statement([Account(f"6.03.0{i}", text, D(v)) for i, (text, v) in enumerate(lines, 1)])
+
+    assert dividends_paid(dfc(("Pagamento de Proventos", "-1444745"))) == D("1444745")  # B3
+    assert dividends_paid(dfc(("Juros s/ o capital próprio", "-630809"))) == D("630809")  # ABC Brasil
+    assert dividends_paid(dfc(("Pagamento e remuneração aos acionistas", "-12186149"))) == D(
+        "12186149"
+    )  # Axia
+    assert dividends_paid(dfc(("Dividendos pagos a acionistas não controladores", "-10"))) == D(0)
+
+
+def test_zero_attribution_line_means_all_controlling():
+    from app.fundamentals.extract import Account, Statement, extract
+
+    # Banco ABC 2022: "Atribuído a Sócios da Empresa Controladora" filed as 0 under a profit of 789.718
+    dre = Statement([
+        Account("3.11", "Lucro ou Prejuízo Líquido do Período", D("789718")),
+        Account("3.11.01", "Atribuído a Sócios da Empresa Controladora", D(0)),
+        Account("3.11.02", "Atribuído a Sócios Não Controladores", D(0)),
+    ])  # fmt: skip
+    assert extract(Statement([]), Statement([]), dre, None).net_income_controlling == D("789718")
 
 
 def test_holding_dividends_come_from_the_parent_only_cash_flow():
@@ -120,12 +158,16 @@ class P:
     gross_debt: D | None = None
     equity: D | None = None
     equity_controlling: D | None = None
+    operating_cash_flow: D | None = None
+    capex: D | None = None
+    total_assets: D | None = None
 
 
 def annual(year, ni, rev, eq, div, ebit=None, da=None):
     return P("DFP", date(year, 12, 31), date(year, 1, 1), revenue=D(rev), net_income_controlling=D(ni),
              equity=D(eq), equity_controlling=D(eq), dividends_paid=D(div), ebit=D(ebit or ni), d_and_a=D(da or 0),
-             current_assets=D(300), current_liabilities=D(200), cash=D(100), gross_debt=D(400))  # fmt: skip
+             current_assets=D(300), current_liabilities=D(200), cash=D(100), gross_debt=D(400),
+             operating_cash_flow=D(ni), capex=D(20), total_assets=D(eq) * 4)  # fmt: skip
 
 
 def company():
@@ -140,11 +182,12 @@ def company():
     ]
     q2 = P("ITR", date(2026, 6, 30), date(2026, 1, 1), net_income_controlling=D(120), ebit=D(170), d_and_a=D(50),
            revenue=D(800), equity=D(1600), equity_controlling=D(1600), current_assets=D(330), current_liabilities=D(220),
-           cash=D(150), gross_debt=D(450))  # fmt: skip
+           cash=D(150), gross_debt=D(450), operating_cash_flow=D(130), capex=D(40), total_assets=D(6400))  # fmt: skip
     q2_prior = P("ITR", date(2025, 6, 30), date(2025, 1, 1), comparative=True, net_income_controlling=D(90),
-                 ebit=D(140), d_and_a=D(45), revenue=D(700))  # fmt: skip
+                 ebit=D(140), d_and_a=D(45), revenue=D(700), operating_cash_flow=D(100), capex=D(30))  # fmt: skip
     q2_prior_balance = P("ITR", date(2025, 6, 30), date(2025, 1, 1), net_income_controlling=D(90), ebit=D(140),
-                         d_and_a=D(45), revenue=D(700), equity=D(1400), equity_controlling=D(1400))  # fmt: skip
+                         d_and_a=D(45), revenue=D(700), equity=D(1400), equity_controlling=D(1400),
+                         operating_cash_flow=D(100), capex=D(30))  # fmt: skip
     return [*years, q2, q2_prior, q2_prior_balance]
 
 
@@ -196,30 +239,84 @@ def test_debt_valuation_and_graham():
     assert r.value("bazin_price").quantize(D("0.01")) == D("13.33")
 
 
-def test_negative_eps_disables_pe_and_graham():
+def test_negative_eps_makes_pe_invalid_not_missing():
     data = company()
     data[-3].net_income_controlling = D(-500)  # loss in 2026 YTD
     r = compute(
         data, ShareCount(D(100), D(0), D(0), D(0), "B3", None), D(23), {"ON": D(23)}, None, None, None
     )
-    assert r.value("pe") is None
-    assert r.indicators["pe"].note == "LPA ≤ 0"
+    pe = r.indicators["pe"]
+    assert (pe.value, pe.note, pe.invalid) == (None, "LPA ≤ 0", True)
     assert r.value("graham_price") is None
 
 
+def test_cash_flow_indicators():
+    r = run()
+    # FCO = net income every year → conversion 1,0 ; FCF TTM = (130 + 200 − 100) − (40 + 20 − 30) = 200
+    assert r.value("cash_conversion_5y") == D(1)
+    assert r.value("fcf_yield") == D(200) / D(2300)
+    assert r.value("equity_to_assets") == D("0.25")
+    assert r.value("cagr_book_5y").quantize(D("0.0001")) == D("0.0845")  # (1500/1000)^(1/5) − 1
+    assert r.value("earnings_drops_5y") == 0
+
+
+def test_earnings_drops_and_invalid_cagr():
+    data = company()
+    data[2].net_income_controlling = D(100)  # 2022: 120 → 100, −17% (not a drop)
+    data[3].net_income_controlling = D(70)  # 2023: 100 → 70, −30% (drop)
+    data[5].net_income_controlling = D(-10)  # 2025: loss (drop)
+    r = compute(data, None, None, {}, None)
+    assert r.value("earnings_drops_5y") == 2
+    cagr = r.indicators["cagr_earnings_5y"]
+    assert (cagr.value, cagr.invalid, cagr.note) == (None, True, "valor final ≤ 0")
+    data[0].net_income_controlling = D(-5)  # base ≤ 0 → no rate at all (N/A, not invalid)
+    cagr = compute(data, None, None, {}, None).indicators["cagr_earnings_5y"]
+    assert (cagr.value, cagr.invalid) == (None, False)
+
+
+def test_ev_includes_minority_interests_and_normalized_multiples():
+    data = company()
+    data[-3].equity = D(1700)  # 100 of minority interests in the latest balance
+    r = compute(data, ShareCount(D(100), D(0), D(0), D(0), "B3", None), D(23), {"ON": D(23)}, None)
+    ev = D(2300) + D(300) + D(100)
+    assert r.value("ev_ebit") == ev / D(330)
+    # 5-year averages (2021–2025): net income 160, EBIT (120+140+160+180+300)/5 = 180, EBITDA 180 + 20
+    assert r.value("pe_norm") == D(23) / D("1.6")
+    assert r.value("ev_ebit_norm") == ev / D(180)
+    assert r.value("net_debt_ebitda_norm") == D(300) / D(200)
+
+
+def test_dy_is_missing_when_cvm_shows_no_dividends_but_b3_does():
+    data = company()
+    for p in data:
+        p.dividends_paid = D(0)
+    shares = ShareCount(D(100), D(0), D(0), D(0), "B3", None)
+    r = compute(data, shares, D(23), {"ON": D(23)}, None, b3_pays_dividends=True)
+    assert r.value("dy_5y") is None
+    assert "B3" in r.indicators["dy_5y"].note
+    assert any("DY sem dados" in n for n in r.notes)
+    assert compute(data, shares, D(23), {"ON": D(23)}, None, b3_pays_dividends=False).value("dy_5y") == 0
+
+
 @pytest.mark.parametrize(
-    ("sector", "template", "expected"),
+    ("sector", "template", "ticker", "expected"),
     [
-        ("Bancos", "BANK", "FINANCIAL"),
-        ("Emp. Adm. Part. - Seguradoras e Corretoras", "INDUSTRIAL", "FINANCIAL"),
-        ("Emp. Adm. Part. - Intermediação Financeira", "INDUSTRIAL", "FINANCIAL"),
-        ("Energia Elétrica", "INDUSTRIAL", "UTILITY"),
-        ("Saneamento, Serv. Água e Gás", "INDUSTRIAL", "UTILITY"),
-        ("Petróleo e Gás", "INDUSTRIAL", None),
+        ("Bancos", "BANK", None, "FINANCIAL"),
+        ("Emp. Adm. Part. - Seguradoras e Corretoras", "INDUSTRIAL", None, "FINANCIAL"),
+        ("Emp. Adm. Part. - Intermediação Financeira", "INDUSTRIAL", None, "FINANCIAL"),
+        ("Emp. Adm. Part. - Crédito Imobiliário", "INDUSTRIAL", None, "FINANCIAL"),
+        ("Energia Elétrica", "INDUSTRIAL", None, "UTILITY"),
+        ("Saneamento, Serv. Água e Gás", "INDUSTRIAL", None, "UTILITY"),
+        ("Saneamento, Serv. Água e Gás", "INDUSTRIAL", "AMBP3", None),  # manual override
+        ("Petróleo e Gás", "INDUSTRIAL", None, "CYCLICAL"),
+        ("Emp. Adm. Part. - Metalurgia e Siderurgia", "INDUSTRIAL", None, "CYCLICAL"),
+        ("Agricultura (Açúcar, Álcool e Cana)", "INDUSTRIAL", None, "CYCLICAL"),
+        ("Bolsas de Valores/Mercadorias e Futuros", "INDUSTRIAL", None, None),
+        ("Alimentos", "INDUSTRIAL", None, None),
     ],
 )
-def test_special_sectors(sector, template, expected):
-    assert special_sector(sector, template) == expected
+def test_special_sectors(sector, template, ticker, expected):
+    assert classify_sector(sector, template, ticker) == expected
 
 
 # --- ingestion + on-demand analysis -------------------------------------------------------------
@@ -252,6 +349,8 @@ def test_ingest_and_analyze_cemig(session_factory):
         assert result.companies == 3
         f = service.fundamentals_for(session, "cmig4", FakeMarket(), FakeEvents(), today=date(2026, 10, 8))
     assert (f.ticker, f.template, f.result.special_sector) == ("CMIG4", "INDUSTRIAL", "UTILITY")
+    assert (f.result.issuer, f.result.issuer_status) == ("CMIG", "FASE OPERACIONAL")
+    assert f.result.as_of == date(2026, 10, 8)
     assert f.shares.source == "B3"
     assert f.price == D("12")
     r = f.result

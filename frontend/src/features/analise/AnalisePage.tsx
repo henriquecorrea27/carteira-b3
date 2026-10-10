@@ -98,12 +98,26 @@ function formatIndicator(i: Indicator): string {
       return formatMultiple(i.value);
     case "brl":
       return formatBRL(i.value);
+    case "count":
+      return formatNumber(i.value, { maxDecimals: 0 });
     default:
       return formatNumber(i.value, { minDecimals: 2, maxDecimals: 2 });
   }
 }
 
-function IndicatorTable({ title, score, inconclusive, rows }: { title: string; score: number | null; inconclusive: boolean; rows: Indicator[] }) {
+function IndicatorTable({
+  title,
+  score,
+  inconclusive,
+  stale,
+  rows,
+}: {
+  title: string;
+  score: number | null;
+  inconclusive: boolean;
+  stale?: boolean;
+  rows: Indicator[];
+}) {
   const got = rows.reduce((a, r) => a + Number(r.points ?? 0), 0);
   const possible = rows.filter((r) => r.points !== null).reduce((a, r) => a + Number(r.max_points), 0);
   return (
@@ -117,7 +131,9 @@ function IndicatorTable({ title, score, inconclusive, rows }: { title: string; s
         }
         description={
           inconclusive
-            ? "Nota inconclusiva: mais de 30% do peso está sem dados. A decisão fica em Aguardar."
+            ? stale
+              ? "Nota inconclusiva: os dados contábeis estão defasados. A decisão fica em Aguardar."
+              : "Nota inconclusiva: mais de 30% do peso está sem dados. A decisão fica em Aguardar."
             : `${formatNumber(got, { maxDecimals: 1 })} de ${formatNumber(possible, { maxDecimals: 1 })} pontos possíveis`
         }
       />
@@ -135,7 +151,8 @@ function IndicatorTable({ title, score, inconclusive, rows }: { title: string; s
           {rows.map((r) => {
             const s = STATUS[r.status];
             const Icon = s.icon;
-            const ratio = r.points === null ? 0 : Number(r.points) / Number(r.max_points);
+            const displayOnly = Number(r.max_points) === 0; // weight 0: shown, not scored
+            const ratio = r.points === null || displayOnly ? 0 : Number(r.points) / Number(r.max_points);
             return (
               <TR key={r.key}>
                 <TD className="font-medium">
@@ -145,15 +162,19 @@ function IndicatorTable({ title, score, inconclusive, rows }: { title: string; s
                 <TD numeric className="font-semibold">{formatIndicator(r)}</TD>
                 <TD className="text-ink-2">{r.range_label}</TD>
                 <TD numeric>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-1 w-12 overflow-hidden rounded-full bg-sunken" aria-hidden>
-                      <span className="block h-full rounded-full bg-ink-2" style={{ width: `${ratio * 100}%` }} />
+                  {displayOnly ? (
+                    <span className="text-sm text-muted">só exibido</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-1 w-12 overflow-hidden rounded-full bg-sunken" aria-hidden>
+                        <span className="block h-full rounded-full bg-ink-2" style={{ width: `${ratio * 100}%` }} />
+                      </span>
+                      <span className={r.points === null ? "text-muted" : undefined}>
+                        {r.points === null ? "—" : formatNumber(r.points, { maxDecimals: 1 })}
+                        <span className="text-muted">/{formatNumber(r.max_points, { maxDecimals: 1 })}</span>
+                      </span>
                     </span>
-                    <span className={r.points === null ? "text-muted" : undefined}>
-                      {r.points === null ? "—" : formatNumber(r.points, { maxDecimals: 1 })}
-                      <span className="text-muted">/{formatNumber(r.max_points, { maxDecimals: 1 })}</span>
-                    </span>
-                  </span>
+                  )}
                 </TD>
                 <TD>
                   <span className={cn("inline-flex items-center gap-1.5 text-sm font-medium", s.className)}>
@@ -237,7 +258,7 @@ function Eliminatory({ a }: { a: AssetAnalysis }) {
                   {e.id} · {e.rule}
                 </span>
               </span>
-              <span className="text-right">
+              <span className="max-w-[45%] text-right">
                 <span className="num block font-semibold">{e.value_label ?? "—"}</span>
                 <span className={cn("block text-sm", e.passed === null ? "text-muted" : e.passed ? "text-up" : "text-down")}>
                   {e.passed === null ? "Sem dados" : e.passed ? "Passou" : "Falhou"}
@@ -345,19 +366,28 @@ function AnalysisView({ ticker }: { ticker: string }) {
         )}
       </section>
 
-      {a.warnings.map((w) => (
-        <Callout key={w.source} tone="warn" title={`${w.source} indisponível. Mostrando os últimos dados salvos.`}>
-          {w.message}
+      {a.warnings.length > 0 && (
+        <Callout tone="warn" title="Atenção nesta análise">
+          <ul className="list-disc pl-4">
+            {a.warnings.map((w) => (
+              <li key={w.message}>{w.message}</li>
+            ))}
+          </ul>
         </Callout>
-      ))}
+      )}
       {a.special_sector === "FINANCIAL" && (
         <Callout tone="info" title="Análise parcial — setor financeiro">
-          Bancos e seguradoras não usam EBITDA, dívida líquida, ROIC, EV/EBIT nem liquidez corrente. A nota considera ROE, CAGR do lucro e payout (qualidade) e P/L, P/VP e DY (preço).
+          Bancos e seguradoras não usam EBITDA, dívida líquida, ROIC, EV/EBIT, liquidez corrente nem fluxo de caixa. A qualidade pesa ROE, crescimento do lucro e do patrimônio, PL / ativo (só bancos) e payout; o preço, P/L, DY e P/VP.
         </Callout>
       )}
       {a.special_sector === "UTILITY" && (
         <Callout tone="info" title="Setor de utilidade pública">
-          O limite do eliminatório de dívida líquida / EBITDA é 4,5 em vez de 3,5.
+          Pesos e faixas próprios (dívida mais alta é normal e o dividendo pesa mais). O eliminatório de dívida líquida / EBITDA vai até 4,5 em vez de 3,5.
+        </Callout>
+      )}
+      {a.special_sector === "CYCLICAL" && (
+        <Callout tone="info" title="Setor cíclico (commodities)">
+          P/L e EV/EBIT usam o lucro e o EBIT médios de 5 anos, e a dívida é medida contra o EBITDA médio de 5 anos (limite 3,0): um ano de pico ou de vale engana. O crescimento do lucro não entra na nota.
         </Callout>
       )}
       {!isStock && (
@@ -369,8 +399,8 @@ function AnalysisView({ ticker }: { ticker: string }) {
       {isStock ? (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="flex min-w-0 flex-col gap-5">
-            <IndicatorTable title="Qualidade" score={a.score_quality} inconclusive={a.quality_inconclusive} rows={quality} />
-            <IndicatorTable title="Preço" score={a.score_price} inconclusive={a.price_inconclusive} rows={price} />
+            <IndicatorTable title="Qualidade" score={a.score_quality} inconclusive={a.quality_inconclusive} stale={a.stale} rows={quality} />
+            <IndicatorTable title="Preço" score={a.score_price} inconclusive={a.price_inconclusive} stale={a.stale} rows={price} />
           </div>
           <div className="flex flex-col gap-5">
             <Eliminatory a={a} />
@@ -392,7 +422,7 @@ function AnalysisView({ ticker }: { ticker: string }) {
 
       <p className="text-sm text-muted">
         Dados contábeis: {a.fundamentals_ref ?? "—"}
-        {a.fundamentals_date && ` (data-base ${formatDate(a.fundamentals_date)})`} · Cotação de {formatDate(a.price_date)} · Pesos das regras em avaliação (todos iguais).
+        {a.fundamentals_date && ` (data-base ${formatDate(a.fundamentals_date)})`} · Cotação de {formatDate(a.price_date)} · Regras v2 (pesos por setor, revisão em 30/04/2027).
       </p>
     </div>
   );

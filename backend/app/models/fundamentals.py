@@ -25,6 +25,10 @@ class Company(TimestampMixin, Base):
     treasury_pn: Mapped[Decimal | None]
     shares_source: Mapped[str | None] = mapped_column(String(20))
     shares_as_of: Mapped[dt.date | None] = mapped_column(Date)
+    # CVM registry SIT_EMISSOR (e.g. "FASE OPERACIONAL", "EM RECUPERAÇÃO JUDICIAL OU EQUIVALENTE") — rule E5
+    issuer_status: Mapped[str | None] = mapped_column(String(60))
+    # B3 lists cash dividends in the last ~12 months (cross-checks the CVM dividends; refreshed with shares)
+    b3_pays_dividends: Mapped[bool | None] = mapped_column(Boolean)
 
 
 class CompanyTicker(Base):
@@ -65,6 +69,8 @@ class FundamentalPeriod(TimestampMixin, Base):
     net_income_controlling: Mapped[Decimal | None]
     d_and_a: Mapped[Decimal | None]
     dividends_paid: Mapped[Decimal | None]
+    operating_cash_flow: Mapped[Decimal | None]  # DFC 6.01 (cash from operations)
+    capex: Mapped[Decimal | None]  # positive amount: fixed + intangible + contract assets acquired (DFC 6.02)
 
     total_assets: Mapped[Decimal | None]
     current_assets: Mapped[Decimal | None]
