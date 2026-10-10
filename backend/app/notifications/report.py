@@ -41,6 +41,8 @@ class StockLine:
     reason: str | None
     inconclusive: bool
     analyzed_on: date
+    score_quality: float | None = None  # tie-breaks (stocks.yaml decision.tie_break)
+    liquidity: float | None = None
 
 
 @dataclass
@@ -131,7 +133,9 @@ def build_report(
     """`baseline`: decisions of the previous report (None → first report, no changes section).
     `paid_since`: provents paid after this date are listed (defaults to the report day only)."""
     today = now.date()
-    ctx = DashboardContext(session, today)
+    # Positions and the day's change as of the report day (a late report on a weekend must not compare
+    # Saturday with Friday)
+    ctx = DashboardContext(session, day)
     views = [v for v in positions(ctx) if v.quantity > 0]
     report = DailyReport(day=day, generated_at=now, late=late, has_baseline=baseline is not None)
 
@@ -160,9 +164,20 @@ def build_report(
                     reason=snap.main_reason,
                     inconclusive=snap.inconclusive,
                     analyzed_on=snap.date,
+                    score_quality=snap.score_quality,
+                    liquidity=float((snap.details or {}).get("daily_liquidity") or 0),
                 )
             )
-    report.stocks.sort(key=lambda s: (DECISION_ORDER.index(s.decision), -(s.score or 0), s.ticker))
+    # Ties: final score → quality score → daily liquidity (stocks.yaml decision.tie_break)
+    report.stocks.sort(
+        key=lambda s: (
+            DECISION_ORDER.index(s.decision),
+            -(s.score or 0),
+            -(s.score_quality or 0),
+            -(s.liquidity or 0),
+            s.ticker,
+        )
+    )
     dfps = [s.last_dfp for s in snapshots.values() if s.last_dfp]
     itrs = [s.last_itr for s in snapshots.values() if s.last_itr]
     report.last_dfp, report.last_itr = max(dfps, default=None), max(itrs, default=None)

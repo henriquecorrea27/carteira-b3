@@ -177,6 +177,10 @@ def test_first_report_has_no_changes_and_late_flag(client, session_factory):
         text = render(build_report(s, THU, datetime(2026, 10, 9, 9, 30), late=True))
     assert "Primeiro relatório" in text
     assert "⏰ Enviado com atraso em 09/10 às 09:30" in text
+    # The day's change is Thursday's, not the flat Thursday → Saturday of a late weekend run
+    with session_factory() as s:
+        text = render(build_report(s, THU, datetime(2026, 10, 10, 11, 0), late=True))
+    assert "**Carteira no dia:** +5,57%" in text
 
 
 def test_paid_since_previous_report(client, session_factory):
