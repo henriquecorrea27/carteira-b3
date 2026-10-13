@@ -385,7 +385,11 @@ Para cada ativo pesquisado:
 - Nota final, nota de Qualidade e nota de Preço.
 - Tabela com **todos os indicadores avaliados**: valor, faixa, pontos obtidos/possíveis e status ✅/⚠️/❌/➖.
 - Eliminatórios com passou/falhou.
-- Preço justo Graham, preço teto Bazin e preço atual.
+- Preço justo Graham, preço teto Bazin e preço atual, com o **cálculo passo a passo** (LPA = lucro TTM ÷ ações,
+  VPA = patrimônio ÷ ações, √(22,5 × LPA × VPA); proventos por ação de cada ano, média ÷ 6%). A API manda as entradas
+  em `valuation`.
+- Um **"i"** ao lado de cada termo (indicadores, eliminatórios, notas, colunas) explica o que ele quer dizer ao passar o
+  mouse (textos em `frontend/src/features/analise/glossary.ts`).
 - Data-base dos dados (último DFP/ITR usado e data da cotação).
 
 **Explicabilidade é requisito:** nenhuma decisão sem mostrar o porquê.

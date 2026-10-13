@@ -237,6 +237,15 @@ def test_debt_valuation_and_graham():
     # DPS 5 years: (60+70+80+90+100)/5/100 shares = 0,80 → DY = 0,8/23 ; Bazin = 0,8 / 0,06
     assert r.value("dps_5y") == D("0.8")
     assert r.value("bazin_price").quantize(D("0.01")) == D("13.33")
+    # Inputs shown step by step in the UI: LPA = 230 / 100, VPA = 1600 / 100, DPS per year = paid / 100
+    assert (r.net_income_ttm, r.equity_now, r.shares_outstanding) == (D(230), D(1600), D(100))
+    assert r.dps_by_year == [
+        (2021, D("0.6")),
+        (2022, D("0.7")),
+        (2023, D("0.8")),
+        (2024, D("0.9")),
+        (2025, D("1")),
+    ]
 
 
 def test_negative_eps_makes_pe_invalid_not_missing():

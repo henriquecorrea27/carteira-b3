@@ -209,6 +209,22 @@ export interface EliminatoryCheck {
   passed: boolean | null;
 }
 
+/** Inputs of the Graham fair price and the Bazin ceiling (shown step by step). */
+export interface Valuation {
+  /** LPA TTM = net_income_ttm / shares */
+  eps: Decimal | null;
+  /** VPA = equity / shares */
+  bvps: Decimal | null;
+  net_income_ttm: Decimal | null;
+  equity: Decimal | null;
+  shares: Decimal | null;
+  graham_note: string | null;
+  /** Average of dps_by_year; null when the CVM/B3 cross-check fails. */
+  dps_5y: Decimal | null;
+  dps_note: string | null;
+  dps_by_year: { year: number; dps: Decimal }[];
+}
+
 export interface AssetAnalysis {
   ticker: string;
   name: string;
@@ -238,6 +254,8 @@ export interface AssetAnalysis {
   graham_margin_pct: Decimal | null;
   bazin_ceiling: Decimal | null;
   dy_5y_pct: Decimal | null;
+  /** Null for asset classes without rules. */
+  valuation: Valuation | null;
   warnings: SourceWarning[];
 }
 

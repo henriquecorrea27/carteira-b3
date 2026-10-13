@@ -30,6 +30,25 @@ class EliminatoryOut(_Attrs):
     passed: bool | None
 
 
+class DividendYearOut(BaseModel):
+    year: int
+    dps: Number
+
+
+class ValuationOut(BaseModel):
+    """Inputs of the Graham fair price and the Bazin ceiling, so the UI can show the calculation."""
+
+    eps: Number | None  # LPA TTM = net_income_ttm / shares
+    bvps: Number | None  # VPA = equity / shares
+    net_income_ttm: Money | None
+    equity: Money | None
+    shares: Number | None
+    graham_note: str | None
+    dps_5y: Number | None  # average of dps_by_year (None when the B3 cross-check fails)
+    dps_note: str | None
+    dps_by_year: list[DividendYearOut]
+
+
 class AnalysisOut(BaseModel):
     ticker: str
     name: str
@@ -56,6 +75,7 @@ class AnalysisOut(BaseModel):
     graham_margin: Number | None
     bazin_price: Number | None
     dy_5y: Number | None
+    valuation: ValuationOut
     market_cap: Money | None
     daily_liquidity: Money | None
     last_dfp: dt.date | None
@@ -95,6 +115,17 @@ def analysis_out(ta) -> AnalysisOut:
         graham_margin=r.value("graham_margin"),
         bazin_price=r.value("bazin_price"),
         dy_5y=r.value("dy_5y"),
+        valuation=ValuationOut(
+            eps=r.value("eps"),
+            bvps=r.value("bvps"),
+            net_income_ttm=r.net_income_ttm,
+            equity=r.equity_now,
+            shares=r.shares_outstanding,
+            graham_note=r.indicators["graham_price"].note,
+            dps_5y=r.value("dps_5y"),
+            dps_note=r.indicators["dps_5y"].note,
+            dps_by_year=[DividendYearOut(year=y, dps=v) for y, v in r.dps_by_year],
+        ),
         market_cap=r.value("market_cap"),
         daily_liquidity=r.value("daily_liquidity"),
         last_dfp=r.last_dfp,

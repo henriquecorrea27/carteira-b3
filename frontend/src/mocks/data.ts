@@ -420,7 +420,7 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
   const sector = holding?.sector ?? SECTOR_OF[ticker] ?? null;
   const rand = rng(hash(ticker));
   const price = holding?.price ?? Number((10 + rand() * 60).toFixed(2));
-  const base: Omit<AssetAnalysis, "decision" | "score_final" | "score_quality" | "score_price" | "eliminatory" | "indicators" | "graham_fair_price" | "graham_margin_pct" | "bazin_ceiling" | "dy_5y_pct" | "quality_inconclusive" | "price_inconclusive"> = {
+  const base: Omit<AssetAnalysis, "decision" | "score_final" | "score_quality" | "score_price" | "eliminatory" | "indicators" | "graham_fair_price" | "graham_margin_pct" | "bazin_ceiling" | "dy_5y_pct" | "valuation" | "quality_inconclusive" | "price_inconclusive"> = {
     ticker,
     name: known.name,
     sector,
@@ -452,6 +452,7 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
       graham_margin_pct: null,
       bazin_ceiling: null,
       dy_5y_pct: null,
+      valuation: null,
     };
   }
   const financial = base.special_sector === "FINANCIAL";
@@ -562,6 +563,17 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
     graham_margin_pct: d2(((graham - price) / price) * 100),
     bazin_ceiling: d2(bazin),
     dy_5y_pct: d2((proventos5y / price) * 100),
+    valuation: {
+      eps: lpa.toFixed(4),
+      bvps: vpa.toFixed(4),
+      net_income_ttm: d2(lpa * 1e9),
+      equity: d2(vpa * 1e9),
+      shares: "1000000000",
+      graham_note: null,
+      dps_5y: proventos5y.toFixed(4),
+      dps_note: null,
+      dps_by_year: [0.8, 0.9, 1, 1.1, 1.2].map((f, i) => ({ year: 2021 + i, dps: (proventos5y * f).toFixed(4) })),
+    },
   };
 }
 

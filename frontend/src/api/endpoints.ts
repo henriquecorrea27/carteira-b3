@@ -308,6 +308,7 @@ function toAnalysis(a: W.Analysis): AssetAnalysis {
     graham_margin_pct: toPct(a.graham_margin),
     bazin_ceiling: a.bazin_price,
     dy_5y_pct: toPct(a.dy_5y),
+    valuation: a.valuation,
     warnings: a.warnings
       .filter((w) => !w.startsWith("análise parcial") && !w.startsWith("setor cíclico"))
       .map((w) => ({ source: "Análise", message: w, last_success_at: null })),

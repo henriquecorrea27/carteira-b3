@@ -69,6 +69,12 @@ class FundamentalsResult:
     issuer: str | None = None  # ticker root (PETR), for manual overrides in the rules
     issuer_status: str | None = None  # CVM SIT_EMISSOR (rule E5)
     as_of: date | None = None  # analysis date (staleness of the statements)
+    # Inputs of the Graham and Bazin prices, shown step by step in the UI
+    net_income_ttm: Decimal | None = None  # attributable to the controlling shareholders
+    equity_now: Decimal | None = None  # controlling shareholders' equity, latest balance
+    shares_outstanding: Decimal | None = None  # excluding treasury shares
+    # Dividends + JCP paid per year / current shares
+    dps_by_year: list[tuple[int, Decimal]] = field(default_factory=list)
 
     def value(self, key: str) -> Decimal | None:
         return self.indicators[key].value
@@ -408,7 +414,12 @@ def compute(
         None if graham else "LPA ou VPA ≤ 0",
     )
 
-    dps = [y.dividends_paid / outstanding for y in last5 if y.dividends_paid is not None and outstanding]
+    dps_by_year = [
+        (y.period_end.year, y.dividends_paid / outstanding)
+        for y in last5
+        if y.dividends_paid is not None and outstanding
+    ]
+    dps = [v for _, v in dps_by_year]
     avg_dps = _mean(dps)
     dps_note = "dividendos e JCP pagos (fluxo de caixa CVM) ÷ ações atuais" if dps else None
     if avg_dps == 0 and b3_pays_dividends:
@@ -438,4 +449,8 @@ def compute(
         issuer=issuer,
         issuer_status=issuer_status,
         as_of=as_of,
+        net_income_ttm=ni_ttm,
+        equity_now=eq_now,
+        shares_outstanding=outstanding,
+        dps_by_year=dps_by_year,
     )

@@ -6,13 +6,23 @@ import type { AssetAnalysis, Indicator, IndicatorStatus } from "@/api/types";
 import { PriceChart } from "@/components/charts/PriceChart";
 import { AssetMark, DecisionBadge, Delta, ScoreMeter } from "@/components/domain";
 import { Badge } from "@/components/ui/badge";
+import { InfoTip } from "@/components/ui/menu";
 import { Callout, EmptyState, Panel, PanelHeader, Skeleton } from "@/components/ui/misc";
 import { Segmented } from "@/components/ui/segmented";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
-import { formatBRL, formatDate, formatMultiple, formatNumber, formatPct } from "@/lib/format";
+import { formatBRL, formatDate, formatMultiple, formatNumber, formatPct, toNumber, type Numeric } from "@/lib/format";
 import { ASSET_CLASS_SINGULAR } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { QueryError } from "../shared";
+import { ELIMINATORY_TERMS, INDICATOR_TERMS, TERMS, type Term } from "./glossary";
+
+function Tip({ term, side }: { term: Term; side?: "top" | "bottom" | "left" | "right" }) {
+  return (
+    <InfoTip title={term.title} side={side}>
+      {term.text}
+    </InfoTip>
+  );
+}
 
 function TickerSearch({ autoFocus }: { autoFocus?: boolean }) {
   const navigate = useNavigate();
@@ -111,8 +121,10 @@ function IndicatorTable({
   inconclusive,
   stale,
   rows,
+  term,
 }: {
   title: string;
+  term?: Term;
   score: number | null;
   inconclusive: boolean;
   stale?: boolean;
@@ -125,7 +137,10 @@ function IndicatorTable({
       <PanelHeader
         title={
           <span className="flex items-center gap-3">
-            {title}
+            <span className="flex items-center gap-1.5">
+              {title}
+              {term && <Tip term={term} />}
+            </span>
             <ScoreMeter score={score} inconclusive={inconclusive} size="lg" />
           </span>
         }
@@ -142,9 +157,21 @@ function IndicatorTable({
           <TR className="bg-surface-2">
             <TH>Indicador</TH>
             <TH numeric>Valor</TH>
-            <TH>Faixa ruim → ótimo</TH>
-            <TH numeric>Pontos</TH>
-            <TH>Status</TH>
+            <TH>
+              <span className="inline-flex items-center gap-1">
+                Faixa ruim → ótimo <Tip term={TERMS.range} />
+              </span>
+            </TH>
+            <TH numeric>
+              <span className="inline-flex items-center gap-1">
+                Pontos <Tip term={TERMS.points} />
+              </span>
+            </TH>
+            <TH>
+              <span className="inline-flex items-center gap-1">
+                Status <Tip term={TERMS.status} />
+              </span>
+            </TH>
           </TR>
         </THead>
         <TBody>
@@ -156,7 +183,10 @@ function IndicatorTable({
             return (
               <TR key={r.key}>
                 <TD className="font-medium">
-                  {r.label}
+                  <span className="inline-flex items-center gap-1.5">
+                    {r.label}
+                    {INDICATOR_TERMS[r.key] && <Tip term={INDICATOR_TERMS[r.key]} side="right" />}
+                  </span>
                   {r.note && <div className="text-sm font-normal text-muted">{r.note}</div>}
                 </TD>
                 <TD numeric className="font-semibold">{formatIndicator(r)}</TD>
@@ -194,9 +224,9 @@ function IndicatorTable({
 function PriceScale({ a }: { a: AssetAnalysis }) {
   const price = Number(a.price);
   const marks = [
-    { key: "price", label: "Preço atual", value: price },
-    ...(a.graham_fair_price ? [{ key: "graham", label: "Preço justo Graham", value: Number(a.graham_fair_price) }] : []),
-    ...(a.bazin_ceiling ? [{ key: "bazin", label: "Preço teto Bazin", value: Number(a.bazin_ceiling) }] : []),
+    { key: "price", label: "Preço atual", value: price, term: null as Term | null },
+    ...(a.graham_fair_price ? [{ key: "graham", label: "Preço justo Graham", value: Number(a.graham_fair_price), term: TERMS.graham }] : []),
+    ...(a.bazin_ceiling ? [{ key: "bazin", label: "Preço teto Bazin", value: Number(a.bazin_ceiling), term: TERMS.bazin }] : []),
   ];
   const min = Math.min(...marks.map((m) => m.value)) * 0.85;
   const max = Math.max(...marks.map((m) => m.value)) * 1.08;
@@ -226,6 +256,7 @@ function PriceScale({ a }: { a: AssetAnalysis }) {
             <dt className="flex items-center gap-2 text-ink-2">
               <span aria-hidden className={cn("rounded-full", m.key === "price" ? "size-2.5 bg-ink" : "size-2 bg-ink-2")} />
               {m.label}
+              {m.term && <Tip term={m.term} />}
             </dt>
             <dd className="num font-semibold">
               {formatBRL(m.value)}
@@ -242,10 +273,132 @@ function PriceScale({ a }: { a: AssetAnalysis }) {
   );
 }
 
+/** Big amounts in words: 10,2 bi · 350,4 mi */
+function formatBig(value: Numeric): string {
+  const n = toNumber(value);
+  if (n === null) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `${formatNumber(n / 1e9, { maxDecimals: 2 })} bi`;
+  if (abs >= 1e6) return `${formatNumber(n / 1e6, { maxDecimals: 1 })} mi`;
+  if (abs >= 1e3) return `${formatNumber(n / 1e3, { maxDecimals: 1 })} mil`;
+  return formatNumber(n, { maxDecimals: 0 });
+}
+
+/** −R$ 102,9 mi */
+function formatBigBRL(value: Numeric): string {
+  const n = toNumber(value);
+  if (n === null) return "—";
+  return `${n < 0 ? "−" : ""}R$ ${formatBig(Math.abs(n))}`;
+}
+
+function CalcRow({ label, term, value, detail }: { label: string; term?: Term; value: string; detail?: string }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="flex items-center gap-1 text-ink-2">
+          {label}
+          {term && <Tip term={term} />}
+        </dt>
+        <dd className="num font-medium">{value}</dd>
+      </div>
+      {detail && <p className="num text-xs text-muted">{detail}</p>}
+    </div>
+  );
+}
+
+function Result({ children }: { children: React.ReactNode }) {
+  return <p className="num mt-2.5 rounded-md bg-surface-2 px-3 py-2 text-sm">{children}</p>;
+}
+
+/** Step-by-step Graham fair price and Bazin ceiling, from the same inputs the backend used. */
+function ValuationCalc({ a }: { a: AssetAnalysis }) {
+  const v = a.valuation;
+  if (!v) return null;
+  // Up to 4 decimals so the formula checks by hand against the result (computed with full precision)
+  const exact = (n: Numeric) => formatNumber(n, { minDecimals: 2, maxDecimals: 4 });
+  const years = v.dps_by_year;
+  return (
+    <div className="mt-5 flex flex-col gap-5 border-t border-line pt-4 text-sm">
+      <section aria-label="Cálculo do preço justo de Graham">
+        <h3 className="mb-2 flex items-center gap-1.5 font-semibold">
+          Cálculo de Graham <Tip term={TERMS.graham} />
+        </h3>
+        <dl className="flex flex-col gap-2">
+          <CalcRow
+            label="LPA (12 meses)"
+            term={TERMS.eps}
+            value={formatBRL(v.eps)}
+            detail={v.net_income_ttm !== null && v.shares !== null ? `lucro ${formatBigBRL(v.net_income_ttm)} ÷ ${formatBig(v.shares)} ações` : undefined}
+          />
+          <CalcRow
+            label="VPA"
+            term={TERMS.bvps}
+            value={formatBRL(v.bvps)}
+            detail={v.equity !== null && v.shares !== null ? `patrimônio ${formatBigBRL(v.equity)} ÷ ${formatBig(v.shares)} ações` : undefined}
+          />
+        </dl>
+        {a.graham_fair_price ? (
+          <Result>
+            √(22,5 × {exact(v.eps)} × {exact(v.bvps)}) = <strong className="font-semibold">{formatBRL(a.graham_fair_price)}</strong>
+          </Result>
+        ) : (
+          <p className="mt-2.5 text-muted">Não se aplica: {v.graham_note ?? "LPA ou VPA indisponível"}.</p>
+        )}
+      </section>
+
+      <section aria-label="Cálculo do preço teto de Bazin">
+        <h3 className="mb-2 flex items-center gap-1.5 font-semibold">
+          Cálculo de Bazin <Tip term={TERMS.bazin} />
+        </h3>
+        {years.length > 0 ? (
+          <>
+            <p className="mb-1.5 flex items-center gap-1 text-ink-2">
+              Proventos por ação pagos no ano <Tip term={TERMS.dps} />
+            </p>
+            <dl className="flex flex-col gap-1">
+              {years.map((y) => (
+                <div key={y.year} className="flex justify-between gap-4">
+                  <dt className="num text-ink-2">{y.year}</dt>
+                  <dd className="num">{formatBRL(y.dps, { precise: true })}</dd>
+                </div>
+              ))}
+              <div className="flex justify-between gap-4 border-t border-line pt-1 font-medium">
+                <dt>
+                  Média de {years.length} {years.length === 1 ? "ano" : "anos"}
+                </dt>
+                <dd className="num">{formatBRL(v.dps_5y, { precise: true })}</dd>
+              </div>
+            </dl>
+            {a.bazin_ceiling ? (
+              <Result>
+                {exact(v.dps_5y)} ÷ 6% = <strong className="font-semibold">{formatBRL(a.bazin_ceiling)}</strong>
+                <span className="mt-1 block text-ink-2">
+                  DY médio: {exact(v.dps_5y)} ÷ {exact(a.price)} = {formatPct(a.dy_5y_pct, { decimals: 1 })}
+                </span>
+              </Result>
+            ) : (
+              <p className="mt-2.5 text-muted">Não calculado: {v.dps_note ?? "proventos indisponíveis"}.</p>
+            )}
+          </>
+        ) : (
+          <p className="text-muted">Sem proventos pagos nos balanços da CVM: não há preço teto.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function Eliminatory({ a }: { a: AssetAnalysis }) {
   return (
     <Panel>
-      <PanelHeader title="Eliminatórios" description="Falhar em qualquer um leva a Evitar" />
+      <PanelHeader
+        title={
+          <span className="flex items-center gap-1.5">
+            Eliminatórios <Tip term={TERMS.eliminatory} />
+          </span>
+        }
+        description="Falhar em qualquer um leva a Evitar"
+      />
       <ul className="px-4 pb-3">
         {a.eliminatory.map((e) => {
           const Icon = e.passed === null ? CircleDashed : e.passed ? CheckCircle2 : Ban;
@@ -254,6 +407,11 @@ function Eliminatory({ a }: { a: AssetAnalysis }) {
               <Icon className={cn("size-4 shrink-0", e.passed === null ? "text-muted" : e.passed ? "text-up" : "text-down")} />
               <span className="min-w-0 flex-1">
                 <span className="font-medium">{e.label}</span>
+                {ELIMINATORY_TERMS[e.id] && (
+                  <InfoTip title={e.label} side="left" className="ml-1.5">
+                    {ELIMINATORY_TERMS[e.id]}
+                  </InfoTip>
+                )}
                 <span className="block text-sm text-ink-2">
                   {e.id} · {e.rule}
                 </span>
@@ -347,19 +505,29 @@ function AnalysisView({ ticker }: { ticker: string }) {
         {isStock && (
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3 lg:justify-end">
             <div>
-              <p className="mb-1.5 text-sm text-ink-2">Decisão</p>
+              <p className="mb-1.5 flex items-center gap-1 text-sm text-ink-2">
+                Decisão <Tip term={TERMS.decision} />
+              </p>
               <DecisionBadge decision={a.decision} className="px-2.5 py-1 text-base" />
             </div>
             <div>
-              <p className="text-sm text-ink-2">Nota final</p>
+              <p className="flex items-center gap-1 text-sm text-ink-2">
+                Nota final <Tip term={TERMS.final} />
+              </p>
               <p className="num text-[2.25rem] font-semibold leading-none tracking-tight">{a.score_final ?? "—"}</p>
             </div>
             <div className="flex flex-col gap-1.5">
               <span className="flex items-center justify-between gap-4 text-sm text-ink-2">
-                Qualidade <ScoreMeter score={a.score_quality} inconclusive={a.quality_inconclusive} />
+                <span className="flex items-center gap-1">
+                  Qualidade <Tip term={TERMS.quality} />
+                </span>
+                <ScoreMeter score={a.score_quality} inconclusive={a.quality_inconclusive} />
               </span>
               <span className="flex items-center justify-between gap-4 text-sm text-ink-2">
-                Preço <ScoreMeter score={a.score_price} inconclusive={a.price_inconclusive} />
+                <span className="flex items-center gap-1">
+                  Preço <Tip term={TERMS.price} />
+                </span>
+                <ScoreMeter score={a.score_price} inconclusive={a.price_inconclusive} />
               </span>
             </div>
           </div>
@@ -399,8 +567,8 @@ function AnalysisView({ ticker }: { ticker: string }) {
       {isStock ? (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="flex min-w-0 flex-col gap-5">
-            <IndicatorTable title="Qualidade" score={a.score_quality} inconclusive={a.quality_inconclusive} stale={a.stale} rows={quality} />
-            <IndicatorTable title="Preço" score={a.score_price} inconclusive={a.price_inconclusive} stale={a.stale} rows={price} />
+            <IndicatorTable title="Qualidade" term={TERMS.quality} score={a.score_quality} inconclusive={a.quality_inconclusive} stale={a.stale} rows={quality} />
+            <IndicatorTable title="Preço" term={TERMS.price} score={a.score_price} inconclusive={a.price_inconclusive} stale={a.stale} rows={price} />
           </div>
           <div className="flex flex-col gap-5">
             <Eliminatory a={a} />
@@ -408,10 +576,7 @@ function AnalysisView({ ticker }: { ticker: string }) {
               <PanelHeader title="Preço justo e preço teto" />
               <div className="px-4 pb-4">
                 <PriceScale a={a} />
-                <p className="mt-4 text-sm text-ink-2">
-                  Graham: √(22,5 × LPA × VPA). Bazin: proventos médios de 5 anos ÷ 6%. DY médio 5 anos{" "}
-                  <span className="num font-medium text-ink">{formatPct(a.dy_5y_pct, { decimals: 1 })}</span>.
-                </p>
+                <ValuationCalc a={a} />
               </div>
             </Panel>
           </div>

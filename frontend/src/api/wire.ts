@@ -237,6 +237,17 @@ export interface Analysis {
   graham_margin: Dec | null;
   bazin_price: Dec | null;
   dy_5y: Dec | null;
+  valuation: {
+    eps: Dec | null;
+    bvps: Dec | null;
+    net_income_ttm: Dec | null;
+    equity: Dec | null;
+    shares: Dec | null;
+    graham_note: string | null;
+    dps_5y: Dec | null;
+    dps_note: string | null;
+    dps_by_year: { year: number; dps: Dec }[];
+  };
   market_cap: Dec | null;
   daily_liquidity: Dec | null;
   last_dfp: string | null;

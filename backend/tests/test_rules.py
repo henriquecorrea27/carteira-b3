@@ -411,6 +411,9 @@ def test_analysis_endpoint_explains_the_decision(client, ingested):
     assert len(body["indicators"]) == 13
     assert all({"range_label", "points", "status", "weight"} <= set(i) for i in body["indicators"])
     assert body["last_dfp"] == "2025-12-31"
+    v = body["valuation"]
+    assert v["eps"] is not None and v["bvps"] is not None and v["shares"] is not None
+    assert len(v["dps_by_year"]) == 5
     with ingested() as session:
         snaps = session.query(AnalysisSnapshot).all()
         assert [(s.ticker, s.decision) for s in snaps] == [("CMIG4", body["decision"])]

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { DropdownMenu as Menu, Popover as PopoverPrimitive, Tooltip as TooltipPrimitive } from "radix-ui";
-import { Check } from "lucide-react";
+import { Check, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const DropdownMenu = Menu.Root;
@@ -89,7 +89,9 @@ export function PopoverContent({
 
 export const TooltipProvider = TooltipPrimitive.Provider;
 
-export function Tooltip({ content, children, side = "top" }: { content: React.ReactNode; children: React.ReactNode; side?: "top" | "bottom" | "left" | "right" }) {
+type Side = "top" | "bottom" | "left" | "right";
+
+export function Tooltip({ content, children, side = "top", className }: { content: React.ReactNode; children: React.ReactNode; side?: Side; className?: string }) {
   return (
     <TooltipPrimitive.Root>
       <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
@@ -97,11 +99,41 @@ export function Tooltip({ content, children, side = "top" }: { content: React.Re
         <TooltipPrimitive.Content
           side={side}
           sideOffset={6}
-          className="z-50 max-w-72 rounded-md bg-ink px-2.5 py-1.5 text-sm text-paper shadow-lg data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0"
+          className={cn(
+            "z-50 max-w-72 rounded-md bg-ink px-2.5 py-1.5 text-sm text-paper shadow-lg data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0",
+            className,
+          )}
         >
           {content}
         </TooltipPrimitive.Content>
       </TooltipPrimitive.Portal>
     </TooltipPrimitive.Root>
+  );
+}
+
+/** Small "i" that explains a term on hover or keyboard focus. */
+export function InfoTip({ title, children, side, className }: { title: string; children: React.ReactNode; side?: Side; className?: string }) {
+  return (
+    <Tooltip
+      side={side}
+      className="max-w-80 px-3 py-2 font-normal leading-snug"
+      content={
+        <>
+          <span className="mb-0.5 block font-semibold">{title}</span>
+          {children}
+        </>
+      }
+    >
+      <button
+        type="button"
+        aria-label={`O que é: ${title}`}
+        className={cn(
+          "inline-flex size-4 shrink-0 translate-y-[-1px] items-center justify-center rounded-full align-middle text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20",
+          className,
+        )}
+      >
+        <Info className="size-3.5" />
+      </button>
+    </Tooltip>
   );
 }
