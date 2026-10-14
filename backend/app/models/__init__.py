@@ -5,6 +5,7 @@ from app.models.fundamentals import Company, CompanyTicker, FundamentalPeriod
 from app.models.market import BenchmarkHistory, DataSourceStatus, PriceHistory
 from app.models.notification import ReportDispatch
 from app.models.transaction import Transaction
+from app.models.watchlist import WatchlistItem
 
 __all__ = [
     "AnalysisSnapshot",
@@ -18,4 +19,5 @@ __all__ = [
     "PriceHistory",
     "ReportDispatch",
     "Transaction",
+    "WatchlistItem",
 ]

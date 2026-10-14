@@ -67,6 +67,9 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
      ```
    - Manual: `uv run python -m app.jobs.daily_report --dry-run` (só mostra), `--now` (envia já). Pela UI, o
      botão de avião no topo abre a prévia e o "Enviar relatório agora". Log em `backend/data/logs/`.
+   - **Lista de observação** (aba Observação, ou "Observar" na Análise): ações avisadas só pela distância do preço
+     até a MM200, logo depois do relatório. Para um canal próprio, criar outro webhook e colar em
+     `DISCORD_WATCHLIST_WEBHOOK_URL` (vazio = mesmo canal do relatório).
 
 ## Uso diário (atalho)
 
@@ -109,6 +112,9 @@ cd frontend && npm run test
 | GET | `/api/report/preview` | Prévia do relatório diário (Markdown do Discord, já dividido em mensagens) |
 | POST | `/api/report/send` | Enviar o relatório agora (manual; não conta como o envio agendado) |
 | GET | `/api/report/dispatches` | Últimos envios (agendado/manual, enviado/falhou, atrasado) |
+| GET/POST | `/api/watchlist` | Lista de observação com a distância até a MM200 / adicionar ação |
+| PATCH/DELETE | `/api/watchlist/{ticker}` | Editar a nota / tirar da lista |
+| GET/POST | `/api/watchlist/preview`, `/api/watchlist/send` | Prévia do aviso / enviar agora |
 
 Valores monetários e quantidades trafegam como **string decimal** (nunca float).
 

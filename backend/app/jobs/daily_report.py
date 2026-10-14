@@ -1,12 +1,13 @@
-"""Daily job: refresh prices, provents and decisions, then send the daily report to Discord.
+"""Daily job: refresh prices, provents and decisions, then send the daily report to Discord, followed by the
+watchlist alert (price vs. SMA200; its own channel when DISCORD_WATCHLIST_WEBHOOK_URL is set).
 
 Scheduled by the Windows Task Scheduler (scripts/register_tasks.ps1) on business days after the close and at
 logon. It only sends what is due: a report already sent is not repeated, and a missed day (computer off) is
 sent at the next run, marked as late.
 
     uv run python -m app.jobs.daily_report              # scheduled run (catch-up, no duplicates)
-    uv run python -m app.jobs.daily_report --dry-run    # print the report without sending
-    uv run python -m app.jobs.daily_report --now        # send now (test), outside the schedule
+    uv run python -m app.jobs.daily_report --dry-run    # print the report and the watchlist without sending
+    uv run python -m app.jobs.daily_report --now        # send both now (test), outside the schedule
 """
 
 import argparse
@@ -73,7 +74,8 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")  # emojis on the Windows console
 
     now = service.local_now()
-    notifier = service.get_notifier()
+    notifier, watch_notifier = service.get_notifier(), service.get_watchlist_notifier()
+    market = YFinanceProvider()
     with SessionLocal() as session:
         if args.dry_run or args.now:
             if not args.no_refresh:
@@ -82,24 +84,35 @@ def main(argv: list[str] | None = None) -> int:
             day = service.manual_day(now)
             if args.dry_run:
                 print(service.compose(session, day, now)[1])
+                if service.has_watchlist(session):
+                    print("\n" + service.compose_watchlist(session, day, now, market)[1])
                 return 0
             if notifier is None:
                 log.error("DISCORD_WEBHOOK_URL não configurada em backend/.env")
                 return 2
-            dispatch = service.send_report(session, notifier, day, now, service.MANUAL)
-            log.info("manual report for %s: %s %s", day, dispatch.status, dispatch.error or "")
-            return 0 if dispatch.status == service.SENT else 1
+            dispatches = [service.send_report(session, notifier, day, now, service.MANUAL)]
+            if service.has_watchlist(session):
+                dispatches.append(
+                    service.send_watchlist(session, watch_notifier, day, now, service.MANUAL, market)
+                )
+            for d in dispatches:
+                log.info("manual %s for %s: %s %s", d.kind.lower(), day, d.status, d.error or "")
+            return 0 if all(d.status == service.SENT for d in dispatches) else 1
 
         run = service.run_scheduled(
             session, notifier, now, refresh=None if args.no_refresh else refresh, force=args.force
+        )
+        watch = service.run_scheduled(
+            session, watch_notifier, now, force=args.force, kind=service.WATCHLIST, market=market
         )
     for error in run.refresh_errors:
         log.warning(error)
     if run.status == "NOT_CONFIGURED":
         log.warning("DISCORD_WEBHOOK_URL não configurada em backend/.env — relatório não enviado")
         return 0
-    log.info("report for %s: %s%s %s", run.day, run.status, " (late)" if run.late else "", run.error or "")
-    return 1 if run.status == service.FAILED else 0
+    for name, r in (("report", run), ("watchlist", watch)):
+        log.info("%s for %s: %s%s %s", name, r.day, r.status, " (late)" if r.late else "", r.error or "")
+    return 1 if service.FAILED in (run.status, watch.status) else 0
 
 
 if __name__ == "__main__":

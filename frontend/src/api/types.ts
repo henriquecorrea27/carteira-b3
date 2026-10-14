@@ -375,6 +375,38 @@ export interface ReportPreview {
   last_scheduled: ISODate | null;
 }
 
+/** Watchlist (alerted on Discord only by the price against the SMA200). */
+export type SmaZone = "CHEAP" | "BELOW" | "ABOVE" | "EXPENSIVE";
+
+export interface WatchItem {
+  ticker: string;
+  name: string | null;
+  note: string | null;
+  price: Decimal | null;
+  sma: Decimal | null;
+  distance_pct: Decimal | null; // percentage points: price / SMA − 1
+  zone: SmaZone | null; // null → less history than the SMA needs
+  sessions: number;
+  price_date: ISODate | null;
+}
+
+export interface Watchlist {
+  items: WatchItem[];
+  channel: "SEPARATE" | "SHARED" | null;
+  report_time: string;
+  sma_days: number;
+  cheap_pct: Decimal; // e.g. "-10"
+  expensive_pct: Decimal;
+  last_scheduled: ISODate | null;
+}
+
+export interface WatchlistPreview {
+  date: ISODate;
+  content: string;
+  messages: string[];
+  channel: Watchlist["channel"];
+}
+
 export interface ReportDispatch {
   id: number;
   report_date: ISODate;

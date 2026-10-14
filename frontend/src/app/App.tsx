@@ -11,6 +11,7 @@ const CarteiraPage = lazy(() => import("@/features/carteira/CarteiraPage").then(
 const ProventosPage = lazy(() => import("@/features/proventos/ProventosPage").then((m) => ({ default: m.ProventosPage })));
 const OperacoesPage = lazy(() => import("@/features/operacoes/OperacoesPage").then((m) => ({ default: m.OperacoesPage })));
 const AnalisePage = lazy(() => import("@/features/analise/AnalisePage").then((m) => ({ default: m.AnalisePage })));
+const ObservacaoPage = lazy(() => import("@/features/observacao/ObservacaoPage").then((m) => ({ default: m.ObservacaoPage })));
 const ImportarPage = lazy(() => import("@/features/importar/ImportarPage").then((m) => ({ default: m.ImportarPage })));
 
 function PageFallback() {
@@ -34,6 +35,7 @@ export function App() {
             <Route path="proventos" element={<Suspense fallback={<PageFallback />}><ProventosPage /></Suspense>} />
             <Route path="operacoes" element={<Suspense fallback={<PageFallback />}><OperacoesPage /></Suspense>} />
             <Route path="analise/:ticker?" element={<Suspense fallback={<PageFallback />}><AnalisePage /></Suspense>} />
+            <Route path="observacao" element={<Suspense fallback={<PageFallback />}><ObservacaoPage /></Suspense>} />
             <Route path="importar" element={<Suspense fallback={<PageFallback />}><ImportarPage /></Suspense>} />
             <Route path="*" element={<Navigate to="/carteira" replace />} />
           </Route>

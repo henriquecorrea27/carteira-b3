@@ -25,8 +25,9 @@ HISTORY_DAYS = (
     6 * 365 + 31
 )  # synced once a day: year-end closes of the indicator history (6 DFPs) and the 5y chart
 
-# Ticker → day its history was re-synced with the provider (once a day per process is enough)
-_synced: dict[str, date] = {}
+# Ticker → (day, days) of its last re-sync with the provider (once a day per process is enough, unless a
+# longer history is asked for later that day)
+_synced: dict[str, tuple[date, int]] = {}
 
 
 @dataclass
@@ -55,14 +56,15 @@ def analyze(
 def sync_history(session: Session, ticker: str, market, today: date, days: int = HISTORY_DAYS) -> None:
     """Fetches the last `days` of daily bars once a day per ticker: fills gaps (history older than the
     ~2 months cached for the liquidity) and re-syncs the split-adjusted closes. Failure keeps the cache."""
-    if market is None or _synced.get(ticker) == today:
+    done = _synced.get(ticker)
+    if market is None or (done is not None and done[0] == today and done[1] >= days):
         return
     try:
         fundamentals.fetch_range(session, market, ticker, today - timedelta(days=days), today, resync=True)
     except MarketDataError as err:
         log.warning("price history for %s failed: %s", ticker, err)
         return
-    _synced[ticker] = today
+    _synced[ticker] = (today, days)
 
 
 def technical_for(session: Session, ticker: str, market, today: date, cfg: dict) -> Technical | None:
@@ -71,13 +73,18 @@ def technical_for(session: Session, ticker: str, market, today: date, cfg: dict)
     if not tech_cfg.get("enabled"):
         return None
     sync_history(session, ticker, market, today)
+    return compute_technical(adjusted_closes(session, ticker, today, int(tech_cfg["sma_days"])), tech_cfg)
+
+
+def adjusted_closes(session: Session, ticker: str, today: date, limit: int) -> list[Decimal]:
+    """The last `limit` split-adjusted daily closes up to `today`, oldest first."""
     closes = session.scalars(
         select(PriceHistory.close_adjusted)
         .where(PriceHistory.ticker == ticker, PriceHistory.date <= today)
         .order_by(PriceHistory.date.desc())
-        .limit(int(tech_cfg["sma_days"]))
+        .limit(limit)
     ).all()
-    return compute_technical(list(reversed(closes)), tech_cfg)
+    return list(reversed(closes))
 
 
 def save_snapshot(session: Session, ta: TickerAnalysis, today: date) -> None:

@@ -1,7 +1,8 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Ban, CheckCircle2, CircleDashed, Ruler, Search } from "lucide-react";
-import { useAnalysis, useAssetSearch, usePositions, usePriceBars } from "@/api/hooks";
+import { Ban, Check, CheckCircle2, CircleDashed, Eye, Ruler, Search } from "lucide-react";
+import { toast } from "sonner";
+import { useAddWatch, useAnalysis, useAssetSearch, usePositions, usePriceBars, useRemoveWatch, useWatchlist } from "@/api/hooks";
 import type { AssetAnalysis, Indicator } from "@/api/types";
 import { Legend } from "@/components/charts/common";
 import { PriceChart } from "@/components/charts/PriceChart";
@@ -614,6 +615,35 @@ function SectionNav({ hasHistory }: { hasHistory: boolean }) {
   );
 }
 
+/** Adds or removes the ticker from the watchlist (Discord alert on the price vs. the SMA200). */
+function WatchToggle({ ticker }: { ticker: string }) {
+  const list = useWatchlist();
+  const add = useAddWatch();
+  const remove = useRemoveWatch();
+  const watched = list.data?.items.some((i) => i.ticker === ticker) ?? false;
+  const busy = list.isPending || add.isPending || remove.isPending;
+  const onClick = () =>
+    watched
+      ? remove.mutate(ticker, { onSuccess: () => toast.success(`${ticker} saiu da lista de observação.`), onError: (e) => toast.error(e.message) })
+      : add.mutate(
+          { ticker },
+          { onSuccess: () => toast.success(`${ticker} entrou na lista de observação (aviso diário da MM200 no Discord).`), onError: (e) => toast.error(e.message) },
+        );
+  return (
+    <Button
+      size="sm"
+      variant={watched ? "secondary" : "ghost"}
+      aria-pressed={watched}
+      disabled={busy}
+      onClick={onClick}
+      title={watched ? "Tirar da lista de observação" : "Receber no Discord a distância do preço até a MM200"}
+      className={cn(!watched && "border border-dashed border-line-strong")}
+    >
+      {watched ? <Check /> : <Eye />} {watched ? "Observando" : "Observar"}
+    </Button>
+  );
+}
+
 function AnalysisView({ ticker }: { ticker: string }) {
   const analysis = useAnalysis(ticker);
   const positions = usePositions();
@@ -653,6 +683,7 @@ function AnalysisView({ ticker }: { ticker: string }) {
               <span className="text-ink-2">{a.name}</span>
               {a.sector && <Badge tone="outline">{a.sector}</Badge>}
               {held && <Badge tone="neutral">Na carteira · {formatNumber(held.quantity)} ações</Badge>}
+              <WatchToggle ticker={a.ticker} />
             </div>
             <div className="mt-2 flex flex-wrap items-baseline gap-x-3">
               <span className="text-[2.25rem] font-semibold leading-none tracking-tight">{formatBRL(a.price)}</span>

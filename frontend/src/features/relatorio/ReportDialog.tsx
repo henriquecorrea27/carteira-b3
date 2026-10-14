@@ -88,7 +88,7 @@ function sentAt(iso: string): string {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
-function DispatchRow({ d }: { d: ReportDispatch }) {
+export function DispatchRow({ d }: { d: ReportDispatch }) {
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
       <span className="tabular-nums text-ink">{sentAt(d.created_at)}</span>

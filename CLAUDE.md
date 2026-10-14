@@ -86,7 +86,7 @@ cd frontend && npm run dev                         # UI em http://localhost:5180
 ### Interface (decidido)
 - Idioma da UI: **português**; moeda R$ e números no padrão brasileiro (`1.234,56`, `12,5%`), datas `dd/mm/aaaa`.
 - **Tema claro e escuro**, com alternância pelo usuário (padrão: seguir o sistema).
-- Navegação por **abas no topo** (Carteira, Proventos, Operações, Análise, Importar).
+- Navegação por **abas no topo** (Carteira, Proventos, Operações, Análise, Observação, Importar).
 - Referência funcional: Investidor10 (prints enviados pelo usuário); visual **mais moderno e minimalista**.
 
 ---
@@ -496,6 +496,18 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
   envio do dia.
 - Webhook não configurado: o job sai sem atualizar nem enviar (registra aviso no log).
 
+### 6.5 Lista de observação (pedido do usuário em 14/10/2026)
+Ações que o usuário acompanha (dentro ou fora da carteira), avisadas **só pelo preço em relação à MM200**
+(`app/notifications/watchlist.py`, tabela `watchlist_items`, aba **Observação** e botão "Observar" na Análise).
+- Mesma MM200 e limites da análise gráfica (`technical` no `stocks.yaml`): faixas 🟢 10% ou mais abaixo · 🟡 abaixo ·
+  🟠 acima · 🔴 10% ou mais acima da MM200. Menos de 200 pregões → "sem MM200". Aceita qualquer ticker com cotação
+  no yfinance (ações, FIIs, ETFs, BDRs); histórico de ~400 dias sincronizado uma vez por dia por ticker.
+- Mensagem diária (dias úteis, logo depois do relatório, no mesmo job): **mudanças de faixa** desde o último aviso
+  agendado no topo, depois todas as ações agrupadas por faixa (preço, MM200, distância e nota do usuário).
+- Canal: `DISCORD_WATCHLIST_WEBHOOK_URL` (canal próprio, recomendado); vazio → mesmo webhook do relatório.
+- Mesmo log de envios do relatório (`report_dispatches.kind = WATCHLIST`), com catch-up, sem duplicidade e
+  `decisions` = faixa de cada ticker (base das mudanças). Lista vazia → nada é enviado.
+
 ---
 
 ## 7. Fases
@@ -518,8 +530,7 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 - Editor de pesos na UI (os pesos v2 foram definidos em 10/10/2026).
 - **Backtest** das regras com dados históricos da CVM (atenção a overfitting).
 - Regras para FIIs (P/VP, DY, vacância — dados de informes da CVM).
-- Aprimoramentos das notificações (alertas intradiários, watchlist fora da carteira, preço-alvo).
-- Watchlist.
+- Aprimoramentos das notificações (alertas intradiários, preço-alvo). A lista de observação com a MM200 já existe (§6.5).
 - Pluggy como fonte automática de posição.
 - Renda fixa / Tesouro.
 - IR: apuração mensal, DARF, isenção de R$ 20 mil.

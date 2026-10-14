@@ -16,6 +16,9 @@ export const queryKeys = {
   priceBars: (t: string) => ["prices", t] as const,
   reportPreview: ["report", "preview"] as const,
   reportDispatches: ["report", "dispatches"] as const,
+  watchlist: ["watchlist"] as const,
+  watchlistPreview: ["watchlist", "preview"] as const,
+  watchlistDispatches: ["watchlist", "dispatches"] as const,
 };
 
 export const useSummary = () => useQuery({ queryKey: queryKeys.summary, queryFn: api.getSummary });
@@ -107,6 +110,7 @@ export function useRefreshPrices() {
         qc.invalidateQueries({ queryKey: ["transactions"] }),
         qc.invalidateQueries({ queryKey: ["analysis"] }),
         qc.invalidateQueries({ queryKey: ["report"] }),
+        qc.invalidateQueries({ queryKey: ["watchlist"] }),
       ]),
   });
 }
@@ -123,6 +127,22 @@ export function useSendReport() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["report"] }),
   });
 }
+
+export const useWatchlist = () => useQuery({ queryKey: queryKeys.watchlist, queryFn: api.getWatchlist });
+export const useWatchlistPreview = (enabled: boolean) =>
+  useQuery({ queryKey: queryKeys.watchlistPreview, queryFn: api.getWatchlistPreview, enabled });
+export const useWatchlistDispatches = (enabled: boolean) =>
+  useQuery({ queryKey: queryKeys.watchlistDispatches, queryFn: api.getWatchlistDispatches, enabled });
+
+function useWatchMutation<A>(fn: (args: A) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: fn, onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.watchlist }) });
+}
+
+export const useAddWatch = () => useWatchMutation(({ ticker, note }: { ticker: string; note?: string }) => api.addWatch(ticker, note));
+export const useEditWatch = () => useWatchMutation(({ ticker, note }: { ticker: string; note: string }) => api.editWatch(ticker, note));
+export const useRemoveWatch = () => useWatchMutation((ticker: string) => api.removeWatch(ticker));
+export const useSendWatchlist = () => useWatchMutation(() => api.sendWatchlist());
 
 export function useImportPreview() {
   return useMutation({ mutationFn: (file: File) => api.previewImport(file) });

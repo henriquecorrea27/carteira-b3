@@ -297,6 +297,28 @@ export interface Analysis {
   rules_version: number;
 }
 
+export interface WatchItem {
+  ticker: string;
+  name: string | null;
+  note: string | null;
+  price: Dec | null;
+  sma: Dec | null;
+  distance: Dec | null; // fraction
+  zone: "CHEAP" | "BELOW" | "ABOVE" | "EXPENSIVE" | null;
+  sessions: number;
+  price_date: string | null;
+}
+
+export interface Watchlist {
+  items: WatchItem[];
+  channel: "SEPARATE" | "SHARED" | null;
+  report_time: string;
+  sma_days: number;
+  cheap: Dec;
+  expensive: Dec;
+  last_scheduled: string | null;
+}
+
 export interface PriceBar {
   date: string;
   open: Dec | null;

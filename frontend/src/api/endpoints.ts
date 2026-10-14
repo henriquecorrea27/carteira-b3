@@ -20,6 +20,9 @@ import type {
   PriceBar,
   ReportDispatch,
   ReportPreview,
+  WatchItem,
+  Watchlist,
+  WatchlistPreview,
   ReturnPoint,
   SourceWarning,
   Transaction,
@@ -43,6 +46,21 @@ export function toPct(fraction: string | null | undefined): string | null {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+function toWatchItem(w: W.WatchItem): WatchItem {
+  const { distance, ...rest } = w;
+  return { ...rest, distance_pct: toPct(distance) };
+}
+
+const MOCK_WATCHLIST: Watchlist = {
+  items: [],
+  channel: null,
+  report_time: "19:00",
+  sma_days: 200,
+  cheap_pct: "-10",
+  expensive_pct: "10",
+  last_scheduled: null,
+};
 
 function toPosition(p: W.Position): Position {
   return {
@@ -462,6 +480,32 @@ export const api = {
   getReportDispatches: (): Promise<ReportDispatch[]> =>
     USE_MOCKS ? Promise.resolve([]) : http.get<ReportDispatch[]>("/report/dispatches"),
   sendReport: (): Promise<ReportDispatch> => http.post<ReportDispatch>("/report/send"),
+
+  // Watchlist (Discord alert on the price vs. the SMA200). Mocks: an empty list, read-only.
+  getWatchlist: (): Promise<Watchlist> =>
+    USE_MOCKS
+      ? Promise.resolve(MOCK_WATCHLIST)
+      : http.get<W.Watchlist>("/watchlist").then((w) => ({
+          items: w.items.map(toWatchItem),
+          channel: w.channel,
+          report_time: w.report_time,
+          sma_days: w.sma_days,
+          cheap_pct: toPct(w.cheap) ?? "-10",
+          expensive_pct: toPct(w.expensive) ?? "10",
+          last_scheduled: w.last_scheduled,
+        })),
+  addWatch: (ticker: string, note?: string): Promise<WatchItem> =>
+    http.post<W.WatchItem>("/watchlist", { ticker, note: note || null }).then(toWatchItem),
+  editWatch: (ticker: string, note: string): Promise<WatchItem> =>
+    http.patch<W.WatchItem>(`/watchlist/${encodeURIComponent(ticker)}`, { note: note || null }).then(toWatchItem),
+  removeWatch: (ticker: string): Promise<void> => http.delete<void>(`/watchlist/${encodeURIComponent(ticker)}`),
+  getWatchlistPreview: (): Promise<WatchlistPreview> =>
+    USE_MOCKS
+      ? Promise.resolve({ date: today(), content: "## 📈 Lista de observação\n-# Prévia indisponível nos dados de demonstração.", messages: [], channel: null })
+      : http.get<WatchlistPreview>("/watchlist/preview"),
+  getWatchlistDispatches: (): Promise<ReportDispatch[]> =>
+    USE_MOCKS ? Promise.resolve([]) : http.get<ReportDispatch[]>("/watchlist/dispatches"),
+  sendWatchlist: (): Promise<ReportDispatch> => http.post<ReportDispatch>("/watchlist/send"),
 
   // Import
   previewImport: (file: File): Promise<ImportPreview> =>

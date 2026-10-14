@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://carteira:carteira@localhost:5432/carteira"
     database_url_test: str = "postgresql+psycopg://carteira:carteira@localhost:5432/carteira_test"
     discord_webhook_url: str = ""
+    # Watchlist alert (price vs. SMA200): its own channel; empty → same channel as the daily report
+    discord_watchlist_webhook_url: str = ""
     # Daily report: B3 business days, after the close (HH:MM, America/Sao_Paulo)
     report_time: str = "19:00"
     timezone: str = "America/Sao_Paulo"

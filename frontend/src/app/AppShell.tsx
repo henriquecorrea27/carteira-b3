@@ -22,6 +22,7 @@ const TABS = [
   { to: "/proventos", label: "Proventos" },
   { to: "/operacoes", label: "Operações" },
   { to: "/analise", label: "Análise" },
+  { to: "/observacao", label: "Observação" },
   { to: "/importar", label: "Importar" },
 ];
 
