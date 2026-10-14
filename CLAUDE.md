@@ -438,7 +438,7 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 
 ### 6.2 Conteúdo do relatório diário
 1. **Mudanças desde ontem:** ativos que mudaram de decisão (ex.: AGUARDAR → COMPRAR), no topo e em destaque.
-2. **Ações da carteira por decisão:** 🟢 COMPRAR · 🟡 AGUARDAR · 🔴 EVITAR, cada uma com nota final, preço atual e o principal motivo (indicador que mais pesou a favor ou contra).
+2. **Ações da carteira por decisão:** 🟢 COMPRAR · 🟡 AGUARDAR · 🔴 EVITAR, cada uma com nota final, preço atual, distância da MM200 (ex.: `MM200 +3,9%`, quando há análise gráfica) e o principal motivo (indicador que mais pesou a favor ou contra).
 3. **Proventos:** pagos hoje, datas-com nos próximos 5 dias úteis.
 4. **Pendências:** bonificação sem custo, falha de fonte de dados, nota inconclusiva.
 - FIIs/ETFs/BDRs aparecem só com preço e variação (sem decisão).

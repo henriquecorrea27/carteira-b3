@@ -119,14 +119,20 @@ def _seed(client, session_factory):
                 s.add(
                     PriceHistory(ticker=ticker, date=day, close=D(value), close_adjusted=D(value), source="t")
                 )
-        for ticker, decision, score, reason in [
-            ("CMIG4", "BUY", "83.5", "Margem de segurança Graham 58,9% a favor"),
-            ("BBAS3", "WAIT", "75.4", "CAGR lucro 5a 2,9% contra"),
+        for ticker, decision, score, reason, details in [
+            (
+                "CMIG4",
+                "BUY",
+                "83.5",
+                "Margem de segurança Graham 58,9% a favor",
+                {"technical": {"distance": "0.03862", "sma_days": 200}},
+            ),
+            ("BBAS3", "WAIT", "75.4", "CAGR lucro 5a 2,9% contra", {}),  # no chart analysis
         ]:
             s.add(
                 AnalysisSnapshot(
                     ticker=ticker, date=THU, decision=decision, score_final=D(score), main_reason=reason,
-                    last_dfp=date(2025, 12, 31), last_itr=date(2026, 6, 30), rules_version=1, details={},
+                    last_dfp=date(2025, 12, 31), last_itr=date(2026, 6, 30), rules_version=1, details=details,
                 )
             )  # fmt: skip
         s.add(
@@ -160,9 +166,9 @@ def test_report_sections(client, session_factory):
     assert "**Carteira no dia:** +5,57%" in text  # (1821 − 1725) / 1725
     assert "Patrimônio" not in text and "1.821" not in text
     assert "**CMIG4**: 🟡 Aguardar → **🟢 Comprar** · nota 83,5" in text
-    assert "**CMIG4** · nota 83,5 · R$ 12,00 (+9,09%)" in text
+    assert "**CMIG4** · nota 83,5 · R$ 12,00 (+9,09%) · MM200 +3,9%" in text
     assert "-# Margem de segurança Graham 58,9% a favor" in text
-    assert "**BBAS3** · nota 75,4 · R$ 24,00 (−4,00%)" in text
+    assert "**BBAS3** · nota 75,4 · R$ 24,00 (−4,00%)\n" in text  # no SMA distance without chart analysis
     assert "**HGLG11** R$ 153,00 (+2,00%)" in text
     assert "Pagos hoje: **R$ 50,00** líquido" in text
     assert "- **CMIG4** com 14/10 · JCP R$ 0,2000/ação (≈ R$ 16,50 líquido) · paga 30/12" in text

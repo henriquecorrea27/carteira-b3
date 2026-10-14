@@ -43,6 +43,8 @@ class StockLine:
     analyzed_on: date
     score_quality: float | None = None  # tie-breaks (stocks.yaml decision.tie_break)
     liquidity: float | None = None
+    sma_distance: Decimal | None = None  # price / SMA − 1 (F8 chart analysis)
+    sma_days: int = 200
 
 
 @dataclass
@@ -154,6 +156,8 @@ def build_report(
         elif snap is None:
             report.unanalyzed.append(v.ticker)
         else:
+            technical = (snap.details or {}).get("technical") or {}
+            distance = technical.get("distance")
             report.stocks.append(
                 StockLine(
                     ticker=v.ticker,
@@ -166,6 +170,8 @@ def build_report(
                     analyzed_on=snap.date,
                     score_quality=snap.score_quality,
                     liquidity=float((snap.details or {}).get("daily_liquidity") or 0),
+                    sma_distance=Decimal(str(distance)) if distance is not None else None,
+                    sma_days=technical.get("sma_days") or 200,
                 )
             )
     # Ties: final score → quality score → daily liquidity (stocks.yaml decision.tie_break)
@@ -294,6 +300,15 @@ def _score(value: Decimal | None) -> str:
     return "nota —" if value is None else f"nota {_num(value, 1)}"
 
 
+def _sma(s: StockLine) -> str:
+    """Distance from the SMA200, always with one decimal (e.g. "MM200 +3,9%")."""
+    if s.sma_distance is None:
+        return ""
+    value = round(s.sma_distance * 100, 1)
+    sign = "+" if value > 0 else "−" if value < 0 else ""
+    return f" · MM{s.sma_days} {sign}{_num(abs(value), 1)}%"
+
+
 def _quote(p: Decimal | None, change: Decimal | None) -> str:
     return price(p) + (f" ({pct(change)})" if change is not None else "")
 
@@ -339,7 +354,7 @@ def render(report: DailyReport) -> str:
         out.append("")
         out.append(f"### {DECISIONS[decision]} ({len(group)})")
         for s in group:
-            line = f"**{s.ticker}** · {_score(s.score)} · {_quote(s.price, s.change)}"
+            line = f"**{s.ticker}** · {_score(s.score)} · {_quote(s.price, s.change)}{_sma(s)}"
             if s.inconclusive:
                 line += " · inconclusiva"
             out.append(line)
