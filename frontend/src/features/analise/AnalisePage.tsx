@@ -1,12 +1,13 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Ban, CheckCircle2, CircleDashed, Search } from "lucide-react";
+import { Ban, CheckCircle2, CircleDashed, Ruler, Search } from "lucide-react";
 import { useAnalysis, useAssetSearch, usePositions, usePriceBars } from "@/api/hooks";
 import type { AssetAnalysis, Indicator } from "@/api/types";
 import { Legend } from "@/components/charts/common";
 import { PriceChart } from "@/components/charts/PriceChart";
 import { AssetMark, DecisionBadge, Delta, ScoreMeter } from "@/components/domain";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { InfoTip } from "@/components/ui/menu";
 import { Callout, EmptyState, Panel, PanelHeader, Skeleton } from "@/components/ui/misc";
 import { Segmented } from "@/components/ui/segmented";
@@ -513,36 +514,56 @@ function TechnicalPanel({ a }: { a: AssetAnalysis }) {
 
 function PricePanel({ ticker }: { ticker: string }) {
   const bars = usePriceBars(ticker);
-  const [mode, setMode] = React.useState<"area" | "candles">("area");
+  const [mode, setMode] = React.useState<"area" | "candles">("candles");
   const [range, setRange] = React.useState<"6m" | "1y" | "2y" | "5y">("1y");
-  const [data, smaLine] = React.useMemo(() => {
-    if (!bars.data) return [[], []];
-    const days = { "6m": 126, "1y": 252, "2y": 504, "5y": bars.data.length }[range];
-    // SMA over the whole history, then cut to the visible range (the first 199 days have no SMA)
+  const [ruler, setRuler] = React.useState(false);
+  const smaLine = React.useMemo(() => {
+    if (!bars.data) return [];
+    // The first 199 days have no SMA
     const values = sma(bars.data.map((b) => Number(b.close)), SMA_DAYS);
-    const line = bars.data.flatMap((b, i) => (values[i] === null ? [] : [{ time: b.time, value: values[i]! }]));
-    const visible = bars.data.slice(-days);
-    return [visible, line.filter((p) => p.time >= visible[0]?.time)];
-  }, [bars.data, range]);
+    return bars.data.flatMap((b, i) => (values[i] === null ? [] : [{ time: b.time, value: values[i]! }]));
+  }, [bars.data]);
+  const visibleBars = { "6m": 126, "1y": 252, "2y": 504, "5y": null }[range];
   return (
     <Panel id="cotacao" className="scroll-mt-20">
       <PanelHeader
         title="Cotação"
-        description="Fechamento diário ajustado por desdobramentos e bonificações."
+        description="Gráfico diário ajustado por desdobramentos e bonificações. Arraste para mover, use a roda do mouse para dar zoom; a régua (ou Shift + clique) mede a variação entre dois pontos."
         actions={
           <>
             <Segmented aria-label="Período do gráfico" size="sm" value={range} onChange={setRange} options={[{ value: "6m", label: "6M" }, { value: "1y", label: "1A" }, { value: "2y", label: "2A" }, { value: "5y", label: "5A" }]} />
-            <Segmented aria-label="Tipo de gráfico" size="sm" value={mode} onChange={setMode} options={[{ value: "area", label: "Linha" }, { value: "candles", label: "Candles" }]} />
+            <Segmented aria-label="Tipo de gráfico" size="sm" value={mode} onChange={setMode} options={[{ value: "candles", label: "Candles" }, { value: "area", label: "Linha" }]} />
+            <Button
+              size="sm"
+              variant={ruler ? "primary" : "secondary"}
+              aria-pressed={ruler}
+              onClick={() => setRuler((r) => !r)}
+              title="Medir a variação entre dois pontos (atalho: Shift + clique no gráfico)"
+            >
+              <Ruler aria-hidden /> Régua
+            </Button>
           </>
         }
       />
       <div className="px-2 pb-3">
-        {bars.data ? <PriceChart bars={data} mode={mode} overlay={smaLine} /> : <Skeleton className="mx-2 h-80" />}
+        {bars.data ? (
+          <PriceChart
+            bars={bars.data}
+            mode={mode}
+            overlay={smaLine}
+            overlayLabel={`MM${SMA_DAYS}`}
+            visibleBars={visibleBars}
+            ruler={ruler}
+            onRulerChange={setRuler}
+          />
+        ) : (
+          <Skeleton className="mx-2 h-[420px]" />
+        )}
         {smaLine.length > 0 && (
           <Legend
             className="px-2 pt-2"
             items={[
-              { label: "Fechamento diário", color: "var(--series-1)" },
+              ...(mode === "area" ? [{ label: "Fechamento diário", color: "var(--series-1)" }] : []),
               { label: `MM${SMA_DAYS} (média de ${SMA_DAYS} pregões)`, color: "var(--series-2)" },
             ]}
           />

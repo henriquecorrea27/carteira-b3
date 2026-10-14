@@ -393,6 +393,9 @@ Implementação: `app/rules/technical.py` (puro) e `rules.service.technical_for`
 com o yfinance uma vez por dia por ticker (`sync_history`), reescrevendo o `close_adjusted` dos dias já em cache
 (um desdobramento depois do cache muda o ajustado); o `close` bruto fica intacto para o livro. O gráfico de cotação
 usa as mesmas barras ajustadas e desenha a MM200; a tela mostra o quadro "Análise gráfica — MM200" com a conta.
+O gráfico imita o TradingView (`components/charts/PriceChart.tsx`): candles por padrão, volume, legenda OHLC do pregão
+sob o cursor, zoom e rolagem livres (6M/1A/2A/5A só movem a visão) e **régua** (botão ou Shift + clique; clique no
+início e no fim) com a variação em R$ e %, pregões e dias corridos. Esc ou um novo clique apaga a medição.
 
 ### 5.7 Saída obrigatória da análise
 Para cada ativo pesquisado:
