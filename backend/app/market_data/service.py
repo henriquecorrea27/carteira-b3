@@ -21,6 +21,8 @@ IBOV_SYMBOL = "^BVSP"
 SOURCE_PRICES, SOURCE_IBOV, SOURCE_CDI = "prices", "ibov", "cdi"
 # Fetch a few days before the first trade so the first valuation has a close to fall back on
 _LOOKBACK = timedelta(days=7)
+# Rows of the last days are fetched again: a row cached during the session holds an intraday price
+REVISE = timedelta(days=7)
 
 
 @dataclass
@@ -65,9 +67,7 @@ def refresh_prices(session: Session, provider: MarketDataProvider, today: date) 
     last = _last_dates(session)
     failed: list[str] = []
     for ticker, first_day in sorted(tracked_tickers(session).items()):
-        start = last[ticker] + timedelta(days=1) if ticker in last else first_day - _LOOKBACK
-        if start > today:
-            continue
+        start = min(last[ticker], today) - REVISE if ticker in last else first_day - _LOOKBACK
         try:
             bars = provider.daily_bars([ticker], start, today).get(ticker, [])
         except MarketDataError as err:
@@ -102,7 +102,8 @@ def refresh_prices(session: Session, provider: MarketDataProvider, today: date) 
                     },
                 )
             )
-            result.prices_inserted += 1
+            if ticker not in last or bar.date > last[ticker]:
+                result.prices_inserted += 1
     if failed:
         result.errors.append(f"preços indisponíveis para: {', '.join(failed)}")
     message = result.errors[-1] if failed else None

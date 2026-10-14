@@ -183,6 +183,8 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 ### 3.8 Preços
 - yfinance com sufixo `.SA`. Atualização: job diário após o fechamento + botão "atualizar agora".
 - Cache em banco (`price_history`). Nunca chamar a API a cada render.
+- Cada atualização busca de novo os últimos 7 dias já em cache (`market_data.service.REVISE`): uma linha gravada
+  durante o pregão guarda um preço intradiário e precisa ser trocada pelo fechamento.
 - Histórico diário desde a primeira operação, para evolução do patrimônio e TWR.
 
 ### 3.9 Proventos e eventos corporativos automáticos
@@ -407,17 +409,18 @@ Para cada ativo pesquisado:
 
 **Tela de Análise (14/10/2026, estilo Investidor10)**, nesta ordem:
 1. Cabeçalho (preço, decisão, notas) e atalhos para as seções.
-2. **Painel de indicadores** por tema: valuation, endividamento, eficiência, rentabilidade, crescimento e dividendos,
+2. **Análise por regras** logo no início: Qualidade, Preço fundamentalista, MM200, eliminatórios, Graham e Bazin.
+3. **Painel de indicadores** por tema: valuation, endividamento, eficiência, rentabilidade, crescimento e dividendos,
    tamanho e liquidez. Inclui indicadores só informativos (`app/fundamentals/indicators.py`, nenhuma regra os usa):
    DY 12m, EV/EBITDA, P/EBIT, P/Receita, P/Ativo, margens EBITDA/EBIT/líquida (12m), ROA, giro do ativo, dívida
    líquida/PL e /EBIT, passivo/ativo, valor da firma, receita/EBITDA/lucro 12m. Os que entram na nota mostram o status.
    Setor financeiro esconde os que não se aplicam (fluxo de caixa, EBIT, EBITDA, receita); os "médios 5a" de P/L, EV/EBIT
    e dívida só aparecem nas cíclicas.
-3. Cotação (até 5 anos) com a MM200.
-4. Gráficos anuais: receita e lucro; ROE e margens; proventos por ação e DY (cada medida no seu gráfico, um eixo só).
-5. **Histórico de indicadores**: uma coluna por DFP + "12M" + média dos 5 últimos anos fechados (a mesma base dos
-   indicadores "médios 5a" das regras).
-6. Análise por regras: Qualidade, Preço fundamentalista, MM200, eliminatórios, Graham e Bazin.
+4. Cotação (até 5 anos) com a MM200.
+5. Gráficos anuais: receita e lucro; ROE e margens; proventos por ação e DY (cada medida no seu gráfico, um eixo só).
+6. **Histórico de indicadores**, enxuto: só 10 razões (P/L, P/VP, DY, ROE, ROIC, margem líquida, dív./EBITDA, LPA,
+   proventos por ação, payout) nos 5 últimos anos fechados + "12M". Padrão "Tendência" (valor mais recente, média 5a e
+   minigráfico); "Tabela" mostra ano a ano. Valores em R$ ficam só nos gráficos.
 
 A API manda `fundamentals` (todos os indicadores) e `history` (`YearFigures`: anos de DFP + 12M). Valores por ação
 usam o número de ações atual; P/L, P/VP e DY dos anos passados usam o último fechamento de dezembro ajustado

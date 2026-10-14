@@ -19,7 +19,7 @@ from app.fundamentals.cvm_parser import CapitalComposition, ParsedPeriod, parse_
 from app.fundamentals.indicators import FundamentalsResult, compute
 from app.fundamentals.shares import ShareCount, from_b3, from_cvm
 from app.market_data.base import MarketDataError, MarketDataProvider
-from app.market_data.service import record_status
+from app.market_data.service import REVISE, record_status
 from app.models import Asset, Company, CompanyTicker, FundamentalPeriod, PriceHistory
 from app.portfolio.tickers import InvalidTickerError, normalize_ticker
 from app.portfolio.types import AssetClass
@@ -314,7 +314,9 @@ def fetch_range(
 ) -> None:
     """Fetch and cache daily bars of one ticker (raises MarketDataError on provider failure).
     `resync` also rewrites cached rows: open/high/low (rows cached before they were stored) and the
-    split-adjusted close (a split after a row was cached changes it). The raw close is kept."""
+    split-adjusted close (a split after a row was cached changes it). The raw close is kept, except in
+    the last days, where a row cached during the session holds an intraday price."""
+    revise_from = end - REVISE
     for bar in provider.daily_bars([ticker], start, end).get(ticker, []):
         stmt = insert(PriceHistory).values(
             ticker=ticker,
@@ -328,15 +330,15 @@ def fetch_range(
             source=provider.name,
         )
         if resync:
-            stmt = stmt.on_conflict_do_update(
-                index_elements=["ticker", "date"],
-                set_={
-                    "open": stmt.excluded.open,
-                    "high": stmt.excluded.high,
-                    "low": stmt.excluded.low,
-                    "close_adjusted": stmt.excluded.close_adjusted,
-                },
-            )
+            update = {
+                "open": stmt.excluded.open,
+                "high": stmt.excluded.high,
+                "low": stmt.excluded.low,
+                "close_adjusted": stmt.excluded.close_adjusted,
+            }
+            if bar.date >= revise_from:
+                update |= {"close": stmt.excluded.close, "volume": stmt.excluded.volume}
+            stmt = stmt.on_conflict_do_update(index_elements=["ticker", "date"], set_=update)
         else:
             stmt = stmt.on_conflict_do_nothing(index_elements=["ticker", "date"])
         session.execute(stmt)

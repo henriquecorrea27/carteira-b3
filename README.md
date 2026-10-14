@@ -120,9 +120,9 @@ eliminatórios E1, E2, E3 e E5 (lucro, patrimônio, dívida e recuperação judi
 A nota de Preço é 75% fundamentos e 25% análise gráfica: distância do preço até a MM200 diária (10% abaixo = 100,
 na média = 50, 10% acima = 0). A tela de Análise mostra a MM200 no gráfico e a conta passo a passo.
 
-A tela de Análise segue o estilo do Investidor10: painel com todos os indicadores por tema, cotação de até 5 anos,
-gráficos anuais (receita e lucro, ROE e margens, proventos por ação e DY), tabela de histórico por ano com os últimos
-12 meses e a média de 5 anos e, por fim, a análise por regras. Depois de atualizar o código, rodar `uv run alembic upgrade head` e
+A tela de Análise segue o estilo do Investidor10: primeiro a análise por regras; depois o painel com todos os
+indicadores por tema, cotação de até 5 anos, gráficos anuais (receita e lucro, ROE e margens, proventos por ação e DY)
+e o histórico dos principais indicadores (tendência de 5 anos, ou tabela ano a ano). Depois de atualizar o código, rodar `uv run alembic upgrade head` e
 `uv run python -m app.jobs.ingest_cvm` (recalcula fluxo de caixa e capex a partir dos arquivos já baixados).
 
 ## Privacidade

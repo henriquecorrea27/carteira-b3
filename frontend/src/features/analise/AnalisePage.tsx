@@ -553,13 +553,24 @@ function PricePanel({ ticker }: { ticker: string }) {
 }
 
 const SECTIONS = [
+  { id: "regras", label: "Análise por regras" },
   { id: "indicadores", label: "Indicadores" },
   { id: "cotacao", label: "Cotação" },
   { id: "resultados", label: "Resultados", history: true },
   { id: "dividendos", label: "Dividendos", history: true },
   { id: "historico", label: "Histórico", history: true },
-  { id: "regras", label: "Análise por regras" },
 ];
+
+function SectionTitle({ id, title, term, children }: { id?: string; title: string; term: Term; children: React.ReactNode }) {
+  return (
+    <header id={id} className="scroll-mt-20 border-t border-line pt-6">
+      <h2 className="flex items-center gap-1.5 text-xl font-semibold tracking-tight">
+        {title} <Tip term={term} />
+      </h2>
+      <p className="mt-1 max-w-3xl text-ink-2">{children}</p>
+    </header>
+  );
+}
 
 /** In-page shortcuts to the sections of a long analysis. */
 function SectionNav({ hasHistory }: { hasHistory: boolean }) {
@@ -692,20 +703,12 @@ function AnalysisView({ ticker }: { ticker: string }) {
       )}
 
       {isStock && <SectionNav hasHistory={a.history.length > 0} />}
-      {isStock && a.fundamentals.length > 0 && <IndicatorPanel a={a} />}
-      <PricePanel ticker={a.ticker} />
-      {isStock && <HistorySection a={a} />}
 
       {isStock && (
-        <header id="regras" className="scroll-mt-20 border-t border-line pt-6">
-          <h2 className="flex items-center gap-1.5 text-xl font-semibold tracking-tight">
-            Análise por regras <Tip term={TERMS.rules} />
-          </h2>
-          <p className="mt-1 max-w-3xl text-ink-2">
-            Qualidade com médias e crescimento de 5 anos (ROE, margem, payout, FCO/lucro, CAGR); preço com os múltiplos atuais, o DY médio de 5 anos e a MM200.
-            Cada indicador é pontuado entre uma faixa ruim e uma ótima.
-          </p>
-        </header>
+        <SectionTitle id="regras" title="Análise por regras" term={TERMS.rules}>
+          Qualidade com médias e crescimento de 5 anos (ROE, margem, payout, FCO/lucro, CAGR); preço com os múltiplos atuais, o DY médio de 5 anos e a MM200.
+          Cada indicador é pontuado entre uma faixa ruim e uma ótima.
+        </SectionTitle>
       )}
 
       {isStock ? (
@@ -738,6 +741,15 @@ function AnalysisView({ ticker }: { ticker: string }) {
           </div>
         </div>
       ) : null}
+
+      {isStock && (
+        <SectionTitle title="Dados da empresa" term={TERMS.panel}>
+          Indicadores atuais, cotação, resultados e dividendos ano a ano.
+        </SectionTitle>
+      )}
+      {isStock && a.fundamentals.length > 0 && <IndicatorPanel a={a} />}
+      <PricePanel ticker={a.ticker} />
+      {isStock && <HistorySection a={a} />}
 
       <p className="text-sm text-muted">
         Dados contábeis: {a.fundamentals_ref ?? "—"}

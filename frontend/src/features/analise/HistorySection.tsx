@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, Responsiv
 import type { AssetAnalysis, IndicatorUnit, YearFigures } from "@/api/types";
 import { ChartTooltipBox, Legend, axisProps, gridProps, type TooltipRow } from "@/components/charts/common";
 import { Panel, PanelHeader } from "@/components/ui/misc";
+import { Segmented } from "@/components/ui/segmented";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { formatBRL, formatNumber, formatPct, toNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -236,82 +237,171 @@ function DividendsPanel({ a }: { a: AssetAnalysis }) {
   );
 }
 
-type Row = { label: string; key: keyof YearFigures; unit: IndicatorUnit; avg?: boolean; term?: Term };
+type Row = { label: string; key: keyof YearFigures; unit: IndicatorUnit; term?: Term };
 
-const SECTIONS: { title: string; rows: Row[] }[] = [
-  {
-    title: "Valuation",
-    rows: [
-      { label: "P/L", key: "pe", unit: "x", avg: true, term: INDICATOR_TERMS.pe },
-      { label: "P/VP", key: "pb", unit: "x", avg: true, term: INDICATOR_TERMS.pb },
-      { label: "Dividend yield", key: "dy_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.dy_12m },
-      { label: "Cotação (dezembro)", key: "price", unit: "brl" },
-      { label: "LPA", key: "eps", unit: "brl", avg: true, term: INDICATOR_TERMS.eps },
-      { label: "VPA", key: "bvps", unit: "brl", term: INDICATOR_TERMS.bvps },
-      { label: "Proventos por ação", key: "dps", unit: "brl", avg: true, term: TERMS.dps },
-    ],
-  },
-  {
-    title: "Resultados",
-    rows: [
-      { label: "Receita líquida", key: "revenue", unit: "brl", avg: true },
-      { label: "EBITDA", key: "ebitda", unit: "brl", avg: true, term: INDICATOR_TERMS.ebitda_ttm },
-      { label: "Lucro líquido", key: "net_income", unit: "brl", avg: true },
-      { label: "Margem EBIT", key: "ebit_margin_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.ebit_margin },
-      { label: "Margem líquida", key: "net_margin_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.net_margin },
-    ],
-  },
-  {
-    title: "Rentabilidade",
-    rows: [
-      { label: "ROE", key: "roe_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.roe },
-      { label: "ROIC", key: "roic_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.roic },
-    ],
-  },
-  {
-    title: "Endividamento",
-    rows: [
-      { label: "Dívida líquida", key: "net_debt", unit: "brl", term: INDICATOR_TERMS.net_debt },
-      { label: "Dív. líquida / EBITDA", key: "net_debt_ebitda", unit: "x", avg: true, term: INDICATOR_TERMS.net_debt_ebitda },
-      { label: "Liquidez corrente", key: "current_ratio", unit: "x", avg: true, term: INDICATOR_TERMS.current_ratio },
-      { label: "Patrimônio líquido", key: "equity", unit: "brl" },
-    ],
-  },
-  {
-    title: "Caixa e proventos",
-    rows: [
-      { label: "Fluxo de caixa operacional", key: "operating_cash_flow", unit: "brl", avg: true },
-      { label: "Capex", key: "capex", unit: "brl", avg: true },
-      { label: "Proventos pagos", key: "dividends_paid", unit: "brl", avg: true },
-      { label: "Payout", key: "payout_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.payout_5y },
-    ],
-  },
+/** The few ratios worth following year by year (the amounts in R$ are in the charts above). */
+const ROWS: Row[] = [
+  { label: "P/L", key: "pe", unit: "x", term: INDICATOR_TERMS.pe },
+  { label: "P/VP", key: "pb", unit: "x", term: INDICATOR_TERMS.pb },
+  { label: "Dividend yield", key: "dy_pct", unit: "pct", term: INDICATOR_TERMS.dy_12m },
+  { label: "ROE", key: "roe_pct", unit: "pct", term: INDICATOR_TERMS.roe },
+  { label: "ROIC", key: "roic_pct", unit: "pct", term: INDICATOR_TERMS.roic },
+  { label: "Margem líquida", key: "net_margin_pct", unit: "pct", term: INDICATOR_TERMS.net_margin },
+  { label: "Dív. líquida / EBITDA", key: "net_debt_ebitda", unit: "x", term: INDICATOR_TERMS.net_debt_ebitda },
+  { label: "LPA", key: "eps", unit: "brl", term: INDICATOR_TERMS.eps },
+  { label: "Proventos por ação", key: "dps", unit: "brl", term: TERMS.dps },
+  { label: "Payout", key: "payout_pct", unit: "pct", term: INDICATOR_TERMS.payout_5y },
 ];
 
-/** Banks and insurers: their cash flows and EBIT/EBITDA do not mean the same as in other companies. */
-const BANK_HIDDEN = new Set<keyof YearFigures>(["ebitda", "ebit_margin_pct", "roic_pct", "net_debt", "net_debt_ebitda", "current_ratio", "operating_cash_flow", "capex"]);
+/** Banks and insurers: ROIC and EBITDA do not mean the same as in other companies. */
+const BANK_HIDDEN = new Set<keyof YearFigures>(["roic_pct", "net_debt_ebitda"]);
 
+/** 1 decimal for ratios and percentages, cents for amounts per share. */
 function cell(value: string | number | null, unit: IndicatorUnit): string {
-  return formatValue(value, unit, unit === "pct" ? 1 : 2);
+  return formatValue(value, unit, unit === "brl" ? 2 : 1);
 }
 
 /** Average of the last 5 closed years (at least 3 with data), like the "médio 5a" indicators of the rules. */
 function avg5(history: YearFigures[], key: keyof YearFigures): number | null {
   const values = history
     .filter((h) => h.year !== null)
-    .slice(-5)
     .map((h) => toNumber(h[key] as string | null))
     .filter((v): v is number => v !== null);
   return values.length >= 3 ? values.reduce((s, v) => s + v, 0) / values.length : null;
 }
 
-/** Indicators by year (columns), like a stock site's history table, plus the 5-year average. */
-function HistoryTable({ history, financial }: { history: YearFigures[]; financial: boolean }) {
-  const sections = SECTIONS.map((s) => ({
-    ...s,
-    rows: s.rows.filter((r) => !(financial && BANK_HIDDEN.has(r.key)) && history.some((h) => h[r.key] !== null)),
-  })).filter((s) => s.rows.length > 0);
+/** Latest value: the last 12 months when there is a quarterly report, else the last fiscal year. */
+function latest(history: YearFigures[], key: keyof YearFigures): { value: string | null; label: string } {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const v = history[i][key] as string | null;
+    if (v !== null) return { value: v, label: history[i].label };
+  }
+  return { value: null, label: "" };
+}
+
+function Sparkline({ history, row }: { history: YearFigures[]; row: Row }) {
+  const data = history.map((h) => ({ label: h.label, value: num(h[row.key] as string | null), h }));
+  if (data.filter((d) => d.value !== null).length < 2) return null;
+  return (
+    <div className="h-10 w-full" aria-hidden>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+          <YAxis hide domain={["dataMin", "dataMax"]} />
+          <Tooltip
+            cursor={{ stroke: "var(--line-strong)", strokeWidth: 1 }}
+            allowEscapeViewBox={{ x: true, y: true }}
+            wrapperStyle={{ zIndex: 20 }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const { h } = payload[0].payload as { h: YearFigures };
+              return <ChartTooltipBox title={yearTitle(h.label)} rows={[{ key: "v", label: row.label, value: cell(h[row.key] as string | null, row.unit), color: C1 }]} />;
+            }}
+          />
+          <Line
+            dataKey="value"
+            stroke={C1}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4, fill: C1, stroke: "var(--surface-2)", strokeWidth: 2 }}
+            connectNulls
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** One tile per ratio: the latest value, the 5-year average and the trend line. */
+function TrendTiles({ history, rows }: { history: YearFigures[]; rows: Row[] }) {
+  return (
+    <dl className="grid grid-cols-2 gap-2 px-4 pb-4 sm:grid-cols-3 xl:grid-cols-5">
+      {rows.map((r) => {
+        const last = latest(history, r.key);
+        const n = toNumber(last.value);
+        return (
+          <div key={r.key} className="flex min-w-0 flex-col rounded-md border border-line bg-surface-2 px-3 py-2.5">
+            <dt className="flex min-w-0 items-center gap-1 text-sm text-ink-2">
+              <span className="truncate">{r.label}</span>
+              {r.term && <Tip term={r.term} />}
+            </dt>
+            <dd className={cn("num mt-1 whitespace-nowrap text-xl font-semibold tracking-tight", n !== null && n < 0 && "text-down")}>
+              {cell(last.value, r.unit)}
+              {last.label && <span className="ml-1.5 text-xs font-normal text-muted">{last.label}</span>}
+            </dd>
+            <dd className="num whitespace-nowrap text-xs text-muted">média 5A {cell(avg5(history, r.key), r.unit)}</dd>
+            <dd className="mt-auto pt-1">
+              <Sparkline history={history} row={r} />
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+/** The same ratios as a year-by-year table (the accessible view of the trend lines). */
+function YearTable({ history, rows }: { history: YearFigures[]; rows: Row[] }) {
   const sticky = "sticky left-0 z-[1] bg-surface";
+  return (
+    <Table className="text-sm">
+      <THead>
+        <TR className="bg-surface-2">
+          <TH className={cn(sticky, "bg-surface-2")}>Indicador</TH>
+          {history.map((h) => (
+            <TH key={h.label} numeric>
+              {h.label === "12M" ? (
+                <span className="inline-flex items-center gap-1">
+                  12M <Tip term={TERMS.ttm} side="bottom" />
+                </span>
+              ) : (
+                h.label
+              )}
+            </TH>
+          ))}
+          <TH numeric className="border-l border-line">
+            <span className="inline-flex items-center gap-1">
+              Média 5A <Tip term={TERMS.avg5y} side="left" />
+            </span>
+          </TH>
+        </TR>
+      </THead>
+      <TBody>
+        {rows.map((r) => (
+          <TR key={r.key}>
+            <TD className={cn(sticky, "font-medium")}>
+              <span className="inline-flex items-center gap-1">
+                {r.label}
+                {r.term && <Tip term={r.term} side="right" />}
+              </span>
+            </TD>
+            {history.map((h) => {
+              const v = h[r.key] as string | null;
+              const n = toNumber(v);
+              return (
+                <TD key={h.label} numeric className={cn("num", v === null && "text-muted", n !== null && n < 0 && "text-down")}>
+                  {cell(v, r.unit)}
+                </TD>
+              );
+            })}
+            <TD numeric className="num border-l border-line font-semibold">
+              {cell(avg5(history, r.key), r.unit)}
+            </TD>
+          </TR>
+        ))}
+      </TBody>
+    </Table>
+  );
+}
+
+/** The key ratios over the last 5 fiscal years and the last 12 months: trend tiles, or a table on demand. */
+function HistoryTable({ history: all, financial }: { history: YearFigures[]; financial: boolean }) {
+  const [view, setView] = React.useState<"trend" | "table">("trend");
+  // Last 5 closed years (the base of the 5-year averages) + the last 12 months
+  const years = all.filter((h) => h.year !== null).slice(-5);
+  const history = [...years, ...all.filter((h) => h.year === null)];
+  const rows = ROWS.filter((r) => !(financial && BANK_HIDDEN.has(r.key)) && history.some((h) => h[r.key] !== null));
+  if (rows.length === 0) return null;
   return (
     <Panel id="historico" className="scroll-mt-20">
       <PanelHeader
@@ -320,70 +410,23 @@ function HistoryTable({ history, financial }: { history: YearFigures[]; financia
             Histórico de indicadores <Tip term={TERMS.history} />
           </span>
         }
-        description="Anos fiscais (balanço anual da CVM), últimos 12 meses e a média dos 5 últimos anos fechados."
+        description="Valor mais recente, média dos 5 últimos anos e a tendência ano a ano."
+        actions={
+          <Segmented
+            aria-label="Forma de exibir o histórico"
+            size="sm"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "trend", label: "Tendência" },
+              { value: "table", label: "Tabela" },
+            ]}
+          />
+        }
       />
-      <Table className="text-sm">
-        <THead>
-          <TR className="bg-surface-2">
-            <TH className={cn(sticky, "bg-surface-2")}>Indicador</TH>
-            {history.map((h) => (
-              <TH key={h.label} numeric>
-                {h.label === "12M" ? (
-                  <span className="inline-flex items-center gap-1">
-                    12M <Tip term={TERMS.ttm} side="bottom" />
-                  </span>
-                ) : (
-                  h.label
-                )}
-              </TH>
-            ))}
-            <TH numeric className="border-l border-line">
-              <span className="inline-flex items-center gap-1">
-                Média 5A <Tip term={TERMS.avg5y} side="left" />
-              </span>
-            </TH>
-          </TR>
-        </THead>
-        <TBody>
-          {sections.map((s) => (
-            <React.Fragment key={s.title}>
-              <TR className="bg-surface-2/60">
-                <TD colSpan={history.length + 2} className="h-8 text-xs font-semibold uppercase tracking-wider text-muted">
-                  {s.title}
-                </TD>
-              </TR>
-              {s.rows.map((r) => {
-                const avg = r.avg ? avg5(history, r.key) : null;
-                return (
-                  <TR key={r.key}>
-                    <TD className={cn(sticky, "font-medium")}>
-                      <span className="inline-flex items-center gap-1">
-                        {r.label}
-                        {r.term && <Tip term={r.term} side="right" />}
-                      </span>
-                    </TD>
-                    {history.map((h) => {
-                      const v = h[r.key] as string | null;
-                      const n = toNumber(v);
-                      return (
-                        <TD key={h.label} numeric className={cn("num", v === null && "text-muted", n !== null && n < 0 && "text-down")}>
-                          {cell(v, r.unit)}
-                        </TD>
-                      );
-                    })}
-                    <TD numeric className="num border-l border-line font-semibold">
-                      {r.avg ? cell(avg, r.unit) : <span className="font-normal text-muted">—</span>}
-                    </TD>
-                  </TR>
-                );
-              })}
-            </React.Fragment>
-          ))}
-        </TBody>
-      </Table>
-      <p className="px-4 py-3 text-xs text-muted">
-        Valores por ação usam o número de ações atual; P/L, P/VP e DY dos anos anteriores usam o último fechamento de dezembro (ajustado por desdobramentos e
-        bonificações). A coluna 12M usa o preço atual.
+      {view === "trend" ? <TrendTiles history={history} rows={rows} /> : <YearTable history={history} rows={rows} />}
+      <p className="px-4 pb-3 text-xs text-muted">
+        P/L, P/VP e DY dos anos anteriores usam o fechamento de dezembro e o número de ações atual; o 12M usa o preço atual.
       </p>
     </Panel>
   );

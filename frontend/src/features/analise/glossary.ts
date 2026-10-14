@@ -278,7 +278,7 @@ export const TERMS = {
   },
   history: {
     title: "Histórico de indicadores",
-    text: "Valores de cada ano fiscal (balanço anual, DFP) e dos últimos 12 meses. Anos anteriores usam o fechamento de dezembro, ajustado por desdobramentos, e o número de ações atual. A média de 5 anos considera os 5 últimos anos fechados.",
+    text: "Os principais indicadores nos 5 últimos anos fiscais (balanço anual, DFP) e nos últimos 12 meses: o valor mais recente, a média de 5 anos e a tendência. Em “Tabela”, o valor de cada ano. Anos anteriores usam o fechamento de dezembro, ajustado por desdobramentos, e o número de ações atual.",
   },
   ttm: {
     title: "12M — últimos 12 meses",

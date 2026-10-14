@@ -118,6 +118,17 @@ def test_refresh_then_positions_have_market_values(client, market):
     assert client.post("/api/market-data/refresh").json()["prices_inserted"] == 0
 
 
+def test_refresh_replaces_an_intraday_price_with_the_close(client, market):
+    _seed(client)
+    market(PRICES)
+    client.post("/api/market-data/refresh")  # during the session: WEGE3 at 50
+    market({**PRICES, "WEGE3": {**PRICES["WEGE3"], days_ago(1): "47", TODAY: "52"}})
+    assert client.post("/api/market-data/refresh").json()["prices_inserted"] == 0
+
+    wege = {p["ticker"]: p for p in client.get("/api/portfolio/positions").json()}["WEGE3"]
+    assert (wege["current_price"], wege["day_change_pct"]) == ("52", "0.10638298")  # 52 / 47 − 1
+
+
 def test_summary_history_and_allocation(client, market):
     _seed(client)
     market(PRICES)
