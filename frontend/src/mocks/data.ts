@@ -436,6 +436,7 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
     score_price_fundamental: null,
     score_technical: null,
     technical_weight: 0,
+    technical: null,
   };
   if (known.asset_class !== "STOCK") {
     return {
@@ -542,7 +543,10 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
   ];
   const failed = eliminatory.some((e) => e.passed === false);
   const sq = q.score;
-  const sp = p.score;
+  // Chart analysis (F8): distance from the SMA200 → 50 − 5 × distance, blended with weight 0,25
+  const distance = (profile.p - 0.5) * -24 + (rand() - 0.5) * 6;
+  const tech = Math.round(Math.min(100, Math.max(0, 50 - 5 * distance)) * 10) / 10;
+  const sp = p.score === null ? null : Math.round((0.75 * p.score + 0.25 * tech) * 10) / 10;
   let decision: Decision;
   if (failed) decision = "AVOID";
   else if (q.inconclusive || p.inconclusive) decision = "WAIT";
@@ -554,6 +558,20 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
     decision,
     score_quality: sq,
     score_price: sp,
+    score_price_fundamental: p.score,
+    score_technical: tech,
+    technical_weight: 0.25,
+    technical: {
+      score: tech,
+      sma: d2(price / (1 + distance / 100)),
+      distance_pct: d2(distance),
+      price: d2(price),
+      sessions: 200,
+      sma_days: 200,
+      cheap_pct: "-10",
+      expensive_pct: "10",
+      note: null,
+    },
     score_final: sq !== null && sp !== null ? Math.round(0.6 * sq + 0.4 * sp) : null,
     quality_inconclusive: q.inconclusive,
     price_inconclusive: p.inconclusive,

@@ -21,6 +21,9 @@ def test_engine():
 
 @pytest.fixture
 def session_factory(test_engine):
+    from app.rules import service as rules_service
+
+    rules_service._synced.clear()  # history re-sync memo would leak between tests
     with test_engine.begin() as conn:
         tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
         conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))

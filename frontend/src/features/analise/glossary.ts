@@ -122,7 +122,7 @@ export const TERMS = {
   },
   price: {
     title: "Nota de Preço",
-    text: "De 0 a 100: o quanto a ação está barata (múltiplos, dividendos e caixa livre). Com prejuízo nos últimos 12 meses fica limitada a 40.",
+    text: "De 0 a 100: o quanto a ação está barata. 75% vem dos fundamentos (múltiplos, dividendos e caixa livre) e 25% da posição do preço em relação à MM200 (análise gráfica). Com prejuízo nos últimos 12 meses fica limitada a 40.",
   },
   range: {
     title: "Faixa ruim → ótimo",
@@ -147,6 +147,22 @@ export const TERMS = {
   bazin: {
     title: "Preço teto de Bazin",
     text: "Método de Décio Bazin: o preço máximo para que os proventos rendam pelo menos 6% ao ano. Proventos por ação médios de 5 anos ÷ 6%. Acima desse preço, o dividendo rende menos de 6%.",
+  },
+  technical: {
+    title: "Análise gráfica (MM200)",
+    text: "Compara o preço com a média dos fechamentos dos últimos 200 pregões (gráfico diário). A média é a referência de preço: acima dela a ação está cara, na média é para ficar de olho e abaixo está barata. 10% ou mais abaixo = nota 100; na média = 50; 10% ou mais acima = 0, em linha reta (5 pontos por 1%). Entra com peso de 25% na nota de Preço.",
+  },
+  sma: {
+    title: "MM200 (média móvel de 200 dias)",
+    text: "Média aritmética simples dos últimos 200 fechamentos diários (cerca de 10 meses de pregão), ajustados por desdobramentos, grupamentos e bonificações, como nos sites de gráficos.",
+  },
+  distance: {
+    title: "Distância da MM200",
+    text: "Quanto o preço atual está acima (+) ou abaixo (−) da MM200: preço ÷ MM200 − 1.",
+  },
+  fundamentalPrice: {
+    title: "Preço — fundamentalista",
+    text: "Parte da nota de Preço que vem dos indicadores fundamentalistas (múltiplos, dividendos e caixa livre). Ela pesa 75% na nota de Preço; os outros 25% vêm da análise gráfica (MM200).",
   },
   eps: {
     title: "LPA (lucro por ação)",

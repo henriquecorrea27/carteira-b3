@@ -4,6 +4,7 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
@@ -13,17 +14,22 @@ from app.fundamentals import service as fundamentals
 from app.market_data.base import MarketDataError
 from app.models import AnalysisSnapshot, CompanyTicker, PriceHistory, Transaction
 from app.portfolio.engine import build_portfolio
-from app.rules.engine import Analysis, evaluate
+from app.rules.engine import Analysis, evaluate, load_rules
+from app.rules.technical import Technical, compute_technical
 from app.schemas.analysis import analysis_details
 
 log = logging.getLogger(__name__)
-CHART_DAYS = 730
+CHART_DAYS = 730  # also the history kept for the 200-day SMA (needs ~290 calendar days)
+
+# Ticker → day its history was re-synced with the provider (once a day per process is enough)
+_synced: dict[str, date] = {}
 
 
 @dataclass
 class TickerAnalysis:
     fundamentals: fundamentals.TickerFundamentals
     analysis: Analysis
+    technical: Technical | None = None
 
 
 def analyze(
@@ -31,9 +37,40 @@ def analyze(
 ) -> TickerAnalysis:
     today = today or date.today()
     tf = fundamentals.fundamentals_for(session, ticker, market, events, today)
-    result = TickerAnalysis(tf, evaluate(tf.result))
+    cfg = load_rules()
+    technical = technical_for(session, tf.ticker, market, today, cfg)
+    analysis = evaluate(tf.result, cfg, technical.score if technical else None)
+    result = TickerAnalysis(tf, analysis, technical)
     save_snapshot(session, result, today)
     return result
+
+
+def sync_history(session: Session, ticker: str, market, today: date, days: int = CHART_DAYS) -> None:
+    """Fetches the last `days` of daily bars once a day per ticker: fills gaps (history older than the
+    ~2 months cached for the liquidity) and re-syncs the split-adjusted closes. Failure keeps the cache."""
+    if market is None or _synced.get(ticker) == today:
+        return
+    try:
+        fundamentals.fetch_range(session, market, ticker, today - timedelta(days=days), today, resync=True)
+    except MarketDataError as err:
+        log.warning("price history for %s failed: %s", ticker, err)
+        return
+    _synced[ticker] = today
+
+
+def technical_for(session: Session, ticker: str, market, today: date, cfg: dict) -> Technical | None:
+    """Chart analysis (F8) on the split-adjusted daily closes, like any chart site."""
+    tech_cfg = cfg.get("technical") or {}
+    if not tech_cfg.get("enabled"):
+        return None
+    sync_history(session, ticker, market, today)
+    closes = session.scalars(
+        select(PriceHistory.close_adjusted)
+        .where(PriceHistory.ticker == ticker, PriceHistory.date <= today)
+        .order_by(PriceHistory.date.desc())
+        .limit(int(tech_cfg["sma_days"]))
+    ).all()
+    return compute_technical(list(reversed(closes)), tech_cfg)
 
 
 def save_snapshot(session: Session, ta: TickerAnalysis, today: date) -> None:
@@ -137,33 +174,39 @@ def decision_changes(session: Session, day: date) -> list[DecisionChange]:
     return changes
 
 
-def price_bars(session: Session, ticker: str, market=None, today: date | None = None, days: int = CHART_DAYS):
-    """Daily bars for the chart, fetching the missing history once (cached in price_history)."""
+@dataclass(frozen=True)
+class Bar:
+    date: date
+    open: Decimal | None
+    high: Decimal | None
+    low: Decimal | None
+    close: Decimal
+    volume: Decimal | None
+
+
+def price_bars(
+    session: Session, ticker: str, market=None, today: date | None = None, days: int = CHART_DAYS
+) -> list[Bar]:
+    """Daily bars for the chart, split-adjusted (same basis as the SMA of the chart analysis)."""
     today = today or date.today()
-    start = today - timedelta(days=days)
-    first = session.scalar(select(func.min(PriceHistory.date)).where(PriceHistory.ticker == ticker))
-    if market is not None and (first is None or first > start + timedelta(days=7)):
-        try:
-            fundamentals.fetch_range(
-                session, market, ticker, start, (first - timedelta(days=1)) if first else today
-            )
-        except MarketDataError as err:  # chart falls back to whatever is cached
-            log.warning("price history for %s failed: %s", ticker, err)
+    sync_history(session, ticker, market, today, max(days, CHART_DAYS))
     fundamentals.ensure_recent_prices(session, market, [ticker], today)
-    missing_ohlc = session.scalar(
-        select(func.min(PriceHistory.date)).where(
-            PriceHistory.ticker == ticker, PriceHistory.date >= start, PriceHistory.open.is_(None)
-        )
+    rows = session.scalars(
+        select(PriceHistory)
+        .where(PriceHistory.ticker == ticker, PriceHistory.date >= today - timedelta(days=days))
+        .order_by(PriceHistory.date)
     )
-    if market is not None and missing_ohlc is not None:
-        try:
-            fundamentals.fetch_range(session, market, ticker, missing_ohlc, today, fill_ohlc=True)
-        except MarketDataError as err:
-            log.warning("OHLC backfill for %s failed: %s", ticker, err)
-    return list(
-        session.scalars(
-            select(PriceHistory)
-            .where(PriceHistory.ticker == ticker, PriceHistory.date >= start)
-            .order_by(PriceHistory.date)
+    bars = []
+    for r in rows:
+        k = r.close_adjusted / r.close if r.close else Decimal(1)  # split factor: raw OHLC → adjusted
+        bars.append(
+            Bar(
+                r.date,
+                r.open * k if r.open is not None else None,
+                r.high * k if r.high is not None else None,
+                r.low * k if r.low is not None else None,
+                r.close_adjusted,
+                r.volume / k if r.volume is not None and k else None,
+            )
         )
-    )
+    return bars

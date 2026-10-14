@@ -1,5 +1,6 @@
-# Rules for stocks — SOURCE OF TRUTH (CLAUDE.md §5). Version 2: weights proposed by the analyst agent
-# (.claude/agents/analista-investimentos.md) and approved by the owner on 10/10/2026. Do not change weights,
+# Rules for stocks — SOURCE OF TRUTH (CLAUDE.md §5). Version 3: weights proposed by the analyst agent
+# (.claude/agents/analista-investimentos.md) and approved by the owner on 10/10/2026 (v2); chart analysis
+# (MM200, F8) specified by the owner on 13/10/2026. Do not change weights,
 # ranges or limits without an explicit decision; any approved change goes here AND in CLAUDE.md §5.
 #
 # Gradual scoring: points = clamp((value − bad) / (good − bad), 0, 1) × weight (works for "lower is better"
@@ -15,7 +16,7 @@
 # A rule whose indicator the engine does not compute is skipped (weights renormalize), never counted as N/A.
 # Weight 0 = shown on screen only.
 
-version: 2
+version: 3
 review_date: 2027-04-30  # after the DFP 2026 season; earlier triggers in CLAUDE.md §5
 
 status:
@@ -35,10 +36,15 @@ decision:
   tie_break: [score_final, score_quality, daily_liquidity]  # ordering of lists
 
 # Technical analysis (F8) inside the PRICE score: price = (1 − w) × fundamental + w × technical.
-# Disabled or not computed → w = 0. Never overrides an eliminatory.
+# Not computed (less history than the SMA) → w = 0. Never overrides an eliminatory. Stocks only.
+# The 200-day SMA of the daily split-adjusted closes is a PRICE reference, not an entry signal:
+# distance = price / SMA − 1; 10% below (or more) = 100, on the SMA = 50, 10% above (or more) = 0, linear.
 technical:
-  enabled: false
-  weight: null  # defined by the owner when F8 is specified (analyst's suggestion: 0.10–0.25)
+  enabled: true
+  weight: 0.25
+  sma_days: 200
+  cheap: -0.10  # distance that scores 100
+  expensive: 0.10  # distance that scores 0
 
 # Special-sector classification from the CVM SETOR_ATIV (lower-case, no accents; "Emp. Adm. Part. - <setor>"
 # holdings follow their main sector). First match in `order` wins; anything else is GENERAL.

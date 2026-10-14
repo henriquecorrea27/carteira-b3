@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Ban, CheckCircle2, CircleDashed, CircleMinus, Search, TriangleAlert, XCircle } from "lucide-react";
 import { useAnalysis, useAssetSearch, usePositions, usePriceBars } from "@/api/hooks";
 import type { AssetAnalysis, Indicator, IndicatorStatus } from "@/api/types";
+import { Legend } from "@/components/charts/common";
 import { PriceChart } from "@/components/charts/PriceChart";
 import { AssetMark, DecisionBadge, Delta, ScoreMeter } from "@/components/domain";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { formatBRL, formatDate, formatMultiple, formatNumber, formatPct, toNumber, type Numeric } from "@/lib/format";
 import { ASSET_CLASS_SINGULAR } from "@/lib/labels";
+import { sma } from "@/lib/indicators";
 import { cn } from "@/lib/utils";
 import { QueryError } from "../shared";
 import { ELIMINATORY_TERMS, INDICATOR_TERMS, TERMS, type Term } from "./glossary";
@@ -430,14 +432,127 @@ function Eliminatory({ a }: { a: AssetAnalysis }) {
   );
 }
 
+const SMA_DAYS = 200;
+
+/** Where the price sits between the cheap and the expensive distance from the SMA, and how it scores. */
+function TechnicalPanel({ a }: { a: AssetAnalysis }) {
+  const t = a.technical;
+  if (!t) return null;
+  const cheap = Number(t.cheap_pct);
+  const expensive = Number(t.expensive_pct);
+  const d = toNumber(t.distance_pct);
+  const perPct = 100 / (expensive - cheap); // points lost per 1% above the cheap end
+  const clamped = d === null ? null : Math.min(Math.max(d, cheap), expensive);
+  const pos = clamped === null ? 0 : ((clamped - cheap) / (expensive - cheap)) * 100;
+  const fundamental = a.score_price_fundamental;
+  const blended = fundamental !== null && t.score !== null ? (1 - a.technical_weight) * fundamental + a.technical_weight * t.score : null;
+  // Only the loss cap lowers the price below the blend (0,1 tolerance: the backend rounds the blend)
+  const capped = blended !== null && a.score_price !== null && a.score_price < blended - 0.15;
+  const pct = (n: number) => formatNumber(n * 100, { maxDecimals: 0 });
+  return (
+    <Panel>
+      <PanelHeader
+        title={
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              Análise gráfica — MM{t.sma_days} <Tip term={TERMS.technical} />
+            </span>
+            <ScoreMeter score={t.score} inconclusive={false} size="lg" />
+          </span>
+        }
+        description={`Preço comparado com a média dos últimos ${t.sma_days} pregões (gráfico diário). Peso de ${pct(a.technical_weight || 0.25)}% na nota de Preço.`}
+      />
+      <div className="px-4 pb-4">
+        <dl className="grid grid-cols-3 gap-4">
+          <div>
+            <dt className="text-sm text-ink-2">Preço atual</dt>
+            <dd className="num text-lg font-semibold">{formatBRL(t.price)}</dd>
+          </div>
+          <div>
+            <dt className="flex items-center gap-1 text-sm text-ink-2">
+              MM{t.sma_days} <Tip term={TERMS.sma} />
+            </dt>
+            <dd className="num text-lg font-semibold">{formatBRL(t.sma)}</dd>
+          </div>
+          <div>
+            <dt className="flex items-center gap-1 text-sm text-ink-2">
+              Distância <Tip term={TERMS.distance} />
+            </dt>
+            <dd className={cn("num text-lg font-semibold", d === null ? "text-muted" : d > 0 ? "text-down" : d < 0 ? "text-up" : undefined)}>
+              {d === null ? "—" : formatPct(d, { decimals: 1, signed: true })}
+            </dd>
+          </div>
+        </dl>
+
+        {t.score === null ? (
+          <p className="mt-4 text-sm text-muted">
+            Sem nota gráfica: {t.note ?? "histórico insuficiente"}. A nota de Preço usa só os fundamentos.
+          </p>
+        ) : (
+          <>
+            <div className="mt-6" aria-hidden>
+              <div className="relative h-2 rounded-full bg-gradient-to-r from-up via-warn to-down opacity-70">
+                <span className="absolute top-1/2 left-1/2 h-4 w-px -translate-y-1/2 bg-ink-2" />
+                <span
+                  className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink ring-2 ring-surface"
+                  style={{ left: `${pos}%` }}
+                />
+              </div>
+              <div className="num mt-2 grid grid-cols-3 text-xs text-ink-2">
+                <span>
+                  {formatPct(cheap, { decimals: 0 })} ou menos
+                  <span className="block font-medium text-up">barato · 100</span>
+                </span>
+                <span className="text-center">
+                  na MM{t.sma_days}
+                  <span className="block font-medium">de olho · 50</span>
+                </span>
+                <span className="text-right">
+                  {formatPct(expensive, { decimals: 0, signed: true })} ou mais
+                  <span className="block font-medium text-down">caro · 0</span>
+                </span>
+              </div>
+            </div>
+            <div className="num mt-4 flex flex-col gap-1 rounded-md bg-surface-2 px-3 py-2 text-sm">
+              <span>
+                Nota gráfica:{" "}
+                {d !== null && d > cheap && d < expensive ? (
+                  <>
+                    50 − {formatNumber(perPct, { maxDecimals: 2 })} × ({formatNumber(d, { minDecimals: 2, maxDecimals: 2 })}) ={" "}
+                  </>
+                ) : (
+                  <>além do limite de {formatPct(d !== null && d < 0 ? cheap : expensive, { decimals: 0, signed: true })} → </>
+                )}
+                <strong className="font-semibold">{formatNumber(t.score, { maxDecimals: 1 })}</strong>
+              </span>
+              {blended !== null && (
+                <span className="text-ink-2">
+                  Nota de Preço: {formatNumber(1 - a.technical_weight, { maxDecimals: 2 })} × {formatNumber(fundamental, { maxDecimals: 1 })} (fundamentos) +{" "}
+                  {formatNumber(a.technical_weight, { maxDecimals: 2 })} × {formatNumber(t.score, { maxDecimals: 1 })} (gráfica) ={" "}
+                  <strong className="font-semibold text-ink">{formatNumber(capped ? blended : a.score_price, { minDecimals: 1, maxDecimals: 1 })}</strong>
+                  {capped && <> → limitada a {formatNumber(a.score_price, { maxDecimals: 1 })} (prejuízo nos últimos 12 meses)</>}
+                </span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 function PricePanel({ ticker }: { ticker: string }) {
   const bars = usePriceBars(ticker);
   const [mode, setMode] = React.useState<"area" | "candles">("area");
   const [range, setRange] = React.useState<"6m" | "1y" | "2y">("1y");
-  const data = React.useMemo(() => {
-    if (!bars.data) return [];
+  const [data, smaLine] = React.useMemo(() => {
+    if (!bars.data) return [[], []];
     const days = range === "6m" ? 126 : range === "1y" ? 252 : bars.data.length;
-    return bars.data.slice(-days);
+    // SMA over the whole history, then cut to the visible range (the first 199 days have no SMA)
+    const values = sma(bars.data.map((b) => Number(b.close)), SMA_DAYS);
+    const line = bars.data.flatMap((b, i) => (values[i] === null ? [] : [{ time: b.time, value: values[i]! }]));
+    const visible = bars.data.slice(-days);
+    return [visible, line.filter((p) => p.time >= visible[0]?.time)];
   }, [bars.data, range]);
   return (
     <Panel>
@@ -450,7 +565,18 @@ function PricePanel({ ticker }: { ticker: string }) {
           </>
         }
       />
-      <div className="px-2 pb-3">{bars.data ? <PriceChart bars={data} mode={mode} /> : <Skeleton className="mx-2 h-80" />}</div>
+      <div className="px-2 pb-3">
+        {bars.data ? <PriceChart bars={data} mode={mode} overlay={smaLine} /> : <Skeleton className="mx-2 h-80" />}
+        {smaLine.length > 0 && (
+          <Legend
+            className="px-2 pt-2"
+            items={[
+              { label: "Fechamento diário", color: "var(--series-1)" },
+              { label: `MM${SMA_DAYS} (média de ${SMA_DAYS} pregões)`, color: "var(--series-2)" },
+            ]}
+          />
+        )}
+      </div>
     </Panel>
   );
 }
@@ -568,7 +694,19 @@ function AnalysisView({ ticker }: { ticker: string }) {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="flex min-w-0 flex-col gap-5">
             <IndicatorTable title="Qualidade" term={TERMS.quality} score={a.score_quality} inconclusive={a.quality_inconclusive} stale={a.stale} rows={quality} />
-            <IndicatorTable title="Preço" term={TERMS.price} score={a.score_price} inconclusive={a.price_inconclusive} stale={a.stale} rows={price} />
+            {a.technical ? (
+              <IndicatorTable
+                title="Preço — fundamentalista"
+                term={TERMS.fundamentalPrice}
+                score={a.score_price_fundamental}
+                inconclusive={a.price_inconclusive}
+                stale={a.stale}
+                rows={price}
+              />
+            ) : (
+              <IndicatorTable title="Preço" term={TERMS.price} score={a.score_price} inconclusive={a.price_inconclusive} stale={a.stale} rows={price} />
+            )}
+            <TechnicalPanel a={a} />
           </div>
           <div className="flex flex-col gap-5">
             <Eliminatory a={a} />
@@ -587,7 +725,7 @@ function AnalysisView({ ticker }: { ticker: string }) {
 
       <p className="text-sm text-muted">
         Dados contábeis: {a.fundamentals_ref ?? "—"}
-        {a.fundamentals_date && ` (data-base ${formatDate(a.fundamentals_date)})`} · Cotação de {formatDate(a.price_date)} · Regras v2 (pesos por setor, revisão em 30/04/2027).
+        {a.fundamentals_date && ` (data-base ${formatDate(a.fundamentals_date)})`} · Cotação de {formatDate(a.price_date)} · Regras v3 (pesos por setor + MM200, revisão em 30/04/2027).
       </p>
     </div>
   );

@@ -291,6 +291,17 @@ function toAnalysis(a: W.Analysis): AssetAnalysis {
     score_price_fundamental: a.score_price_fundamental,
     score_technical: a.score_technical,
     technical_weight: a.technical_weight,
+    technical: a.technical && {
+      score: a.technical.score,
+      sma: a.technical.sma,
+      distance_pct: toPct(a.technical.distance),
+      price: a.technical.price,
+      sessions: a.technical.sessions,
+      sma_days: a.technical.sma_days,
+      cheap_pct: toPct(a.technical.cheap) ?? "0",
+      expensive_pct: toPct(a.technical.expensive) ?? "0",
+      note: a.technical.note,
+    },
     eliminatory: a.eliminatory,
     indicators: a.indicators.map((i) => ({
       key: i.key,

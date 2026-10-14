@@ -49,6 +49,20 @@ class ValuationOut(BaseModel):
     dps_by_year: list[DividendYearOut]
 
 
+class TechnicalOut(_Attrs):
+    """Chart analysis (F8): price vs. the 200-day SMA of the split-adjusted daily closes."""
+
+    score: float | None
+    sma: Number | None
+    distance: Number | None  # fraction: price / SMA − 1
+    price: Number | None
+    sessions: int
+    sma_days: int
+    cheap: Number  # distance that scores 100
+    expensive: Number  # distance that scores 0
+    note: str | None
+
+
 class AnalysisOut(BaseModel):
     ticker: str
     name: str
@@ -65,6 +79,7 @@ class AnalysisOut(BaseModel):
     score_price_fundamental: float | None  # before the technical component (F8) and the loss cap
     score_technical: float | None
     technical_weight: float
+    technical: TechnicalOut | None  # None when the chart analysis is disabled
     quality_inconclusive: bool
     price_inconclusive: bool
     stale: bool  # statements too old: scores inconclusive
@@ -105,6 +120,7 @@ def analysis_out(ta) -> AnalysisOut:
         score_price_fundamental=a.score_price_fundamental,
         score_technical=a.score_technical,
         technical_weight=a.technical_weight,
+        technical=TechnicalOut.model_validate(ta.technical) if ta.technical else None,
         quality_inconclusive=a.quality_inconclusive,
         price_inconclusive=a.price_inconclusive,
         stale=a.stale,

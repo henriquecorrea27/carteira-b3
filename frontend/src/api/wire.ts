@@ -216,6 +216,17 @@ export interface Analysis {
   score_price_fundamental: number | null;
   score_technical: number | null;
   technical_weight: number;
+  technical: {
+    score: number | null;
+    sma: Dec | null;
+    distance: Dec | null;
+    price: Dec | null;
+    sessions: number;
+    sma_days: number;
+    cheap: Dec;
+    expensive: Dec;
+    note: string | null;
+  } | null;
   quality_inconclusive: boolean;
   price_inconclusive: boolean;
   stale: boolean;

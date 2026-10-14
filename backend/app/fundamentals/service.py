@@ -310,10 +310,11 @@ def fetch_range(
     ticker: str,
     start: date,
     end: date,
-    fill_ohlc: bool = False,
+    resync: bool = False,
 ) -> None:
     """Fetch and cache daily bars of one ticker (raises MarketDataError on provider failure).
-    `fill_ohlc` also completes open/high/low of rows cached before they were stored."""
+    `resync` also rewrites cached rows: open/high/low (rows cached before they were stored) and the
+    split-adjusted close (a split after a row was cached changes it). The raw close is kept."""
     for bar in provider.daily_bars([ticker], start, end).get(ticker, []):
         stmt = insert(PriceHistory).values(
             ticker=ticker,
@@ -326,10 +327,15 @@ def fetch_range(
             low=bar.low,
             source=provider.name,
         )
-        if fill_ohlc:
+        if resync:
             stmt = stmt.on_conflict_do_update(
                 index_elements=["ticker", "date"],
-                set_={"open": stmt.excluded.open, "high": stmt.excluded.high, "low": stmt.excluded.low},
+                set_={
+                    "open": stmt.excluded.open,
+                    "high": stmt.excluded.high,
+                    "low": stmt.excluded.low,
+                    "close_adjusted": stmt.excluded.close_adjusted,
+                },
             )
         else:
             stmt = stmt.on_conflict_do_nothing(index_elements=["ticker", "date"])

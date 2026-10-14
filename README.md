@@ -112,12 +112,13 @@ cd frontend && npm run test
 
 Valores monetários e quantidades trafegam como **string decimal** (nunca float).
 
-## Regras de análise (v2)
+## Regras de análise (v3)
 
 As notas seguem `backend/rules_config/stocks.yaml` (detalhes no `CLAUDE.md` §5): pesos próprios por setor (geral,
 financeiro, utility e cíclico), indicador inválido vale zero (ex.: P/L com prejuízo), checagem de valores implausíveis,
-eliminatórios E1–E5 (E5 = recuperação judicial/falência), nota final 0,6 × Qualidade + 0,4 × Preço e espaço para a
-nota técnica da F8. Depois de atualizar o código, rodar `uv run alembic upgrade head` e
+eliminatórios E1–E5 (E5 = recuperação judicial/falência) e nota final 0,6 × Qualidade + 0,4 × Preço.
+A nota de Preço é 75% fundamentos e 25% análise gráfica: distância do preço até a MM200 diária (10% abaixo = 100,
+na média = 50, 10% acima = 0). A tela de Análise mostra a MM200 no gráfico e a conta passo a passo. Depois de atualizar o código, rodar `uv run alembic upgrade head` e
 `uv run python -m app.jobs.ingest_cvm` (recalcula fluxo de caixa e capex a partir dos arquivos já baixados).
 
 ## Privacidade

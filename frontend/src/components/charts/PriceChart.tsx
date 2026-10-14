@@ -5,6 +5,7 @@ import {
   ColorType,
   createChart,
   CrosshairMode,
+  LineSeries,
   LineStyle,
   type IChartApi,
   type UTCTimestamp,
@@ -12,7 +13,7 @@ import {
 import type { PriceBar } from "@/api/types";
 import { useCssVars } from "@/app/theme";
 
-const VARS = ["--surface", "--ink-2", "--muted", "--grid", "--line-strong", "--series-1", "--up", "--down"] as const;
+const VARS = ["--surface", "--ink-2", "--muted", "--grid", "--line-strong", "--series-1", "--series-2", "--up", "--down"] as const;
 
 function toTime(iso: string): UTCTimestamp {
   return (Date.parse(`${iso}T00:00:00Z`) / 1000) as UTCTimestamp;
@@ -25,8 +26,23 @@ function hexAlpha(hex: string, alpha: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-/** Price history on TradingView lightweight-charts (base for the F8 chart analysis). */
-export function PriceChart({ bars, mode, height = 320 }: { bars: PriceBar[]; mode: "area" | "candles"; height?: number }) {
+export interface LinePoint {
+  time: string;
+  value: number;
+}
+
+/** Price history on TradingView lightweight-charts, with an optional overlay line (the SMA200 of F8). */
+export function PriceChart({
+  bars,
+  mode,
+  overlay,
+  height = 320,
+}: {
+  bars: PriceBar[];
+  mode: "area" | "candles";
+  overlay?: LinePoint[];
+  height?: number;
+}) {
   const ref = React.useRef<HTMLDivElement>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
   const c = useCssVars(VARS);
@@ -80,12 +96,22 @@ export function PriceChart({ bars, mode, height = 320 }: { bars: PriceBar[]; mod
         bars.map((b) => ({ time: toTime(b.time), open: Number(b.open), high: Number(b.high), low: Number(b.low), close: Number(b.close) })),
       );
     }
+    if (overlay?.length) {
+      const line = chart.addSeries(LineSeries, {
+        color: c["--series-2"],
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: false,
+      });
+      line.setData(overlay.map((p) => ({ time: toTime(p.time), value: p.value })));
+    }
     chart.timeScale().fitContent();
     return () => {
       chart.remove();
       chartRef.current = null;
     };
-  }, [bars, mode, height, c]);
+  }, [bars, mode, overlay, height, c]);
 
   return <div ref={ref} style={{ height }} className="w-full" />;
 }

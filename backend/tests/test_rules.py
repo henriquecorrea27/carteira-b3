@@ -74,10 +74,11 @@ def weights(rules):
 
 
 def test_approved_weights_v2():
-    """CLAUDE.md §5: weights approved by the owner on 10/10/2026 (analyst proposal v2). Changing them needs an
-    explicit decision — update this test, the YAML and CLAUDE.md together."""
+    """CLAUDE.md §5: weights approved by the owner on 10/10/2026 (analyst proposal v2) and the chart analysis
+    specified on 13/10/2026 (v3). Changing them needs an explicit decision — update this test, the YAML and
+    CLAUDE.md together."""
     cfg = load_rules()
-    assert cfg["version"] == 2
+    assert cfg["version"] == 3
     assert weights(cfg["quality"]) == {
         "roic": 20, "roe_5y": 10, "net_margin_5y": 5, "net_debt_ebitda": 20, "current_ratio": 5,
         "cagr_revenue_5y": 10, "cagr_earnings_5y": 10, "cash_conversion_5y": 10, "earnings_drops_5y": 5,
@@ -104,7 +105,13 @@ def test_approved_weights_v2():
         for name, sector in sectors.items():
             assert sum(weights(sector[group]).values()) == 100, (name, group)
     assert cfg["decision"]["final_weights"] == {"quality": 0.6, "price": 0.4}
-    assert cfg["technical"] == {"enabled": False, "weight": None}
+    assert cfg["technical"] == {
+        "enabled": True,
+        "weight": 0.25,
+        "sma_days": 200,
+        "cheap": -0.10,
+        "expensive": 0.10,
+    }
 
 
 # --- scoring ----------------------------------------------------------------------------------
@@ -350,15 +357,22 @@ def test_stale_statements_make_the_scores_inconclusive():
     assert "dados contábeis defasados: sem DFP de 2025" in no_dfp.warnings
 
 
-def test_technical_component_only_counts_when_enabled():
+def test_technical_component_blends_into_the_price_score():
     base = fundamentals_result(pe="13.5")  # fundamental price 90
-    assert evaluate(base, technical=40).score_price == 90.0  # disabled in stocks.yaml
+    a = evaluate(base, technical=40)
+    assert (a.score_price_fundamental, a.score_technical, a.technical_weight) == (90.0, 40, 0.25)
+    assert a.score_price == 77.5  # 0,75 × 90 + 0,25 × 40
+    assert evaluate(base).score_price == 90.0  # not computed (short history) → w = 0
     cfg = copy.deepcopy(load_rules())
-    cfg["technical"] = {"enabled": True, "weight": 0.2}
-    a = evaluate(base, cfg, technical=40)
-    assert (a.score_price_fundamental, a.score_technical, a.technical_weight) == (90.0, 40, 0.2)
-    assert a.score_price == 80.0  # 0,8 × 90 + 0,2 × 40
-    assert evaluate(base, cfg).score_price == 90.0  # not computed yet → w = 0
+    cfg["technical"]["enabled"] = False
+    assert evaluate(base, cfg, technical=40).score_price == 90.0
+
+
+def test_technical_never_saves_a_vetoed_stock_nor_lifts_the_loss_cap():
+    vetoed = evaluate(fundamentals_result(profitable=3), technical=100)
+    assert vetoed.decision == Decision.AVOID and vetoed.score_final <= 30
+    loss = evaluate(fundamentals_result(eps="-1", pe=None, invalid=("pe",)), technical=100)
+    assert loss.score_price <= 40
 
 
 # --- service and API --------------------------------------------------------------------------

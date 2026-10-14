@@ -296,13 +296,14 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 
 ---
 
-## 5. Motor de Regras — v2 (pesos por setor)
+## 5. Motor de Regras — v3 (pesos por setor + MM200)
 
 > Pesos, faixas e travas propostos pelo agente `analista-investimentos` (`.claude/agents/`) e **aprovados pelo
 > usuário em 10/10/2026**. **Não alterar pesos, faixas ou limites sem decisão explícita do usuário.**
 > A implementação lê tudo de `rules_config/stocks.yaml`. Qualquer mudança aprovada deve ser feita no YAML **e** nesta seção
 > (e no teste `test_approved_weights_v2`).
-> A análise gráfica (F8) entra como componente da nota de Preço, com peso `w` definido pelo usuário (seção 5.6).
+> A análise gráfica (F8, MM200) foi especificada pelo usuário em 13/10/2026 e entra como componente da nota de Preço
+> com peso 0,25 (seção 5.6). Versão do YAML: 3.
 > **Revisão:** 30/04/2027 (após a temporada de DFP 2026), ou antes se a Selic sair de 11–17%, o IPCA 12m passar de 6%,
 > mudar a tributação de dividendos/JCP, mudar o layout da CVM ou mais de 10% da carteira ficar inconclusiva.
 
@@ -374,10 +375,22 @@ Dív./EBITDA 30 (2,5 → 0,5) · liquidez corrente 10 (1,0 → 1,8) · CAGR rece
 **Nota final exibida:** 0,6 × Qualidade + 0,4 × Preço (só ordenação; a decisão usa a tabela acima).
 Desempate nas listas: nota final → Qualidade → liquidez.
 
-### 5.6 Componente técnico (F8)
-Preço = (1 − w) × Preço fundamentalista + w × nota técnica (0–100). `technical.enabled: false` e `weight: null` até o
-usuário especificar a F8 (sugestão do analista: w entre 0,10 e 0,25). Enquanto não existir, w = 0 e nunca conta como
-N/A. A parte técnica nunca anula um eliminatório. FIIs, ETFs e BDRs: **sem regras por enquanto**.
+### 5.6 Componente técnico (F8) — MM200 como referência de preço
+Especificado pelo usuário em 13/10/2026. A **MM200 aritmética (simples) do gráfico diário** é usada como parâmetro de
+**preço** (caro ou barato), não como sinal de entrada:
+- Distância = preço ÷ MM200 − 1, com os fechamentos diários **ajustados por desdobramentos, grupamentos e
+  bonificações** (como nos sites de gráficos).
+- Nota técnica linear, travada nos limites: **10% ou mais abaixo da MM200 = 100**, **na MM200 = 50** ("ficar de olho"),
+  **10% ou mais acima = 0**. São 5 pontos por 1% de distância (sem zona neutra).
+- **Preço = 0,75 × Preço fundamentalista + 0,25 × nota técnica** (`technical.weight: 0.25`).
+- Menos de 200 pregões de histórico → sem nota técnica (w = 0, o Preço usa só os fundamentos; nunca conta como N/A).
+- A parte técnica nunca anula um eliminatório nem a trava de prejuízo (Preço ≤ 40 com LPA ≤ 0), aplicada depois da mistura.
+- Só **ações**. FIIs, ETFs e BDRs: **sem regras por enquanto** (a MM200 para eles ainda será estudada).
+
+Implementação: `app/rules/technical.py` (puro) e `rules.service.technical_for`. O histórico de 730 dias é sincronizado
+com o yfinance uma vez por dia por ticker (`sync_history`), reescrevendo o `close_adjusted` dos dias já em cache
+(um desdobramento depois do cache muda o ajustado); o `close` bruto fica intacto para o livro. O gráfico de cotação
+usa as mesmas barras ajustadas e desenha a MM200; a tela mostra o quadro "Análise gráfica — MM200" com a conta.
 
 ### 5.7 Saída obrigatória da análise
 Para cada ativo pesquisado:
@@ -405,7 +418,7 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
   `if_invalid: zero`. `applies_to_template: BANK` aplica a regra só ao plano de contas de banco.
 - Eliminatório sem dados (N/A) **não elimina** (aparece ➖); exceção: E3 com EBITDA ≤ 0 conta como reprovado.
   Com menos de 5 DFPs (mín. 3), o E1 tolera o mesmo número de anos com prejuízo (1).
-- `evaluate(..., technical=nota)` já combina a nota técnica quando habilitada no YAML (F8).
+- `evaluate(..., technical=nota)` combina a nota técnica (F8) quando habilitada no YAML; `analyze` calcula a nota.
 - Motivo principal: eliminatório reprovado; senão, para COMPRAR o indicador que mais pontuou e para os demais o que
   mais perdeu pontos (mostrado na carteira, na Análise e usado no Discord). Indicadores de peso 0 nunca são o motivo.
 - Snapshot diário por ticker (`analysis_snapshots`, 1 linha por ticker/dia, com a análise completa em JSON);
@@ -473,7 +486,7 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 | **F5** | Ingestão CVM, mapeamento ticker↔CNPJ, cálculo dos indicadores |
 | **F6** | Motor de regras (YAML), tela de pesquisa/análise de ativo, nota na carteira, histórico de decisões |
 | **F7** | Relatório diário no Discord |
-| **F8** | **Análise gráfica** (especificação será feita pelo usuário antes de começar) |
+| **F8** | **Análise gráfica**: MM200 diária como referência de preço, peso 0,25 na nota de Preço (seção 5.6) |
 
 ---
 
@@ -492,4 +505,5 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 - [x] Exemplos reais dos extratos B3 recebidos e layout documentado (originais não vão para o git).
 - [x] Criar o **webhook do Discord** e colocar a URL no `.env`.
 - [x] Pesos das regras (seção 5, v2 aprovada em 10/10/2026; revisão em 30/04/2027).
-- [ ] Especificação da análise gráfica (F8).
+- [x] Especificação da análise gráfica (F8, MM200 — 13/10/2026).
+- [ ] Análise gráfica para FIIs, ETFs e BDRs (a estudar).

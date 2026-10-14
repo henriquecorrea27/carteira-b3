@@ -225,6 +225,23 @@ export interface Valuation {
   dps_by_year: { year: number; dps: Decimal }[];
 }
 
+/** Chart analysis (F8): price vs. the 200-day SMA (daily, split-adjusted). Percentages in points. */
+export interface TechnicalAnalysis {
+  /** 0–100; null when there is not enough history (the price score uses the fundamentals only). */
+  score: number | null;
+  sma: Decimal | null;
+  /** Price above (+) or below (−) the SMA, in %. */
+  distance_pct: Decimal | null;
+  price: Decimal | null;
+  sessions: number;
+  sma_days: number;
+  /** Distance that scores 100 (e.g. −10). */
+  cheap_pct: Decimal;
+  /** Distance that scores 0 (e.g. +10). */
+  expensive_pct: Decimal;
+  note: string | null;
+}
+
 export interface AssetAnalysis {
   ticker: string;
   name: string;
@@ -248,6 +265,8 @@ export interface AssetAnalysis {
   score_price_fundamental: number | null;
   score_technical: number | null;
   technical_weight: number;
+  /** Null when the chart analysis is disabled or for asset classes without rules. */
+  technical: TechnicalAnalysis | null;
   eliminatory: EliminatoryCheck[];
   indicators: Indicator[];
   graham_fair_price: Decimal | null;
