@@ -1,6 +1,8 @@
 """Banco Central SGS API (free). Series 12 = CDI daily rate in % per day.
 Response: [{"data": "25/09/2026", "valor": "0.050788"}, ...]. Daily series are limited to 10-year
-windows per request, so long ranges are split."""
+windows per request, so long ranges are split.
+A window with no published value yet (weekend, holiday, today before publication) comes back as
+{"erro": {"statusCode": 404, ...}}, sometimes with HTTP 404 and sometimes with HTTP 200."""
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -49,4 +51,11 @@ class BCBRatesProvider:
             return []
         if response.status_code != 200:
             raise MarketDataError(f"BCB respondeu {response.status_code}")
-        return parse_sgs(response.json())
+        payload = response.json()
+        if isinstance(payload, dict) and isinstance(payload.get("erro"), dict):
+            if payload["erro"].get("statusCode") == 404:
+                return []
+            raise MarketDataError(f"BCB respondeu erro: {payload['erro'].get('detail') or payload['erro']}")
+        if not isinstance(payload, list):
+            raise MarketDataError("BCB respondeu em formato inesperado")
+        return parse_sgs(payload)

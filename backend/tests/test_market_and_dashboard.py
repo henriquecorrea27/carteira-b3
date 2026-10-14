@@ -3,13 +3,14 @@ from datetime import date, timedelta
 from decimal import Decimal as D
 from pathlib import Path
 
+import httpx
 import pandas as pd
 import pytest
 
 from app.api.portfolio import get_market_provider, get_rates_provider
 from app.main import app
 from app.market_data.base import DailyBar, MarketDataError
-from app.market_data.bcb import parse_sgs
+from app.market_data.bcb import BCBRatesProvider, parse_sgs
 from app.market_data.yfinance_provider import unadjust
 
 TODAY = date.today()
@@ -188,6 +189,31 @@ def test_unadjust_rebuilds_raw_close_before_a_split():
     )
     splits = pd.Series([2.0], index=pd.to_datetime(["2024-04-16"]))
     assert unadjust(adjusted, splits).tolist() == [56.0, 27.9, 27.97]
+
+
+def _bcb(handler):
+    return BCBRatesProvider(httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+def test_sgs_not_found_with_http_200_means_no_new_data():
+    # Real answer for 10/10 → 13/10/2026 (weekend + holiday + today not yet published)
+    body = (Path(__file__).parent / "fixtures" / "bcb" / "sgs12_not_found_200.json").read_bytes()
+    assert (
+        _bcb(lambda r: httpx.Response(200, content=body)).cdi_daily(date(2026, 10, 10), date(2026, 10, 13))
+        == []
+    )
+    assert (
+        _bcb(lambda r: httpx.Response(404, content=body)).cdi_daily(date(2026, 10, 13), date(2026, 10, 13))
+        == []
+    )
+
+
+def test_sgs_other_errors_raise():
+    with pytest.raises(MarketDataError, match="formato inesperado"):
+        _bcb(lambda r: httpx.Response(200, json="oops")).cdi_daily(date(2026, 10, 1), date(2026, 10, 2))
+    with pytest.raises(MarketDataError, match="BCB respondeu erro"):
+        error = {"erro": {"statusCode": 500, "detail": "boom"}}
+        _bcb(lambda r: httpx.Response(200, json=error)).cdi_daily(date(2026, 10, 1), date(2026, 10, 2))
 
 
 def test_parse_sgs_real_response():
