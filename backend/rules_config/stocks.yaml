@@ -1,6 +1,7 @@
-# Rules for stocks — SOURCE OF TRUTH (CLAUDE.md §5). Version 3: weights proposed by the analyst agent
+# Rules for stocks — SOURCE OF TRUTH (CLAUDE.md §5). Version 4: weights proposed by the analyst agent
 # (.claude/agents/analista-investimentos.md) and approved by the owner on 10/10/2026 (v2); chart analysis
-# (MM200, F8) specified by the owner on 13/10/2026. Do not change weights,
+# (MM200, F8) specified by the owner on 13/10/2026 (v3); daily-liquidity eliminatory (E4) removed by the
+# owner on 14/10/2026 (v4: the liquidity is still shown and breaks ties). Do not change weights,
 # ranges or limits without an explicit decision; any approved change goes here AND in CLAUDE.md §5.
 #
 # Gradual scoring: points = clamp((value − bad) / (good − bad), 0, 1) × weight (works for "lower is better"
@@ -16,7 +17,7 @@
 # A rule whose indicator the engine does not compute is skipped (weights renormalize), never counted as N/A.
 # Weight 0 = shown on screen only.
 
-version: 3
+version: 4
 review_date: 2027-04-30  # after the DFP 2026 season; earlier triggers in CLAUDE.md §5
 
 status:
@@ -85,9 +86,6 @@ eliminatory:
     max: 3.5
     max_utility: 4.5
     max_cyclical: 3.0  # over the 5-year average EBITDA (fallback: TTM)
-  E4:
-    label: "Liquidez média diária"
-    min_brl: 2000000
   E5:
     label: "Sem recuperação judicial, falência ou liquidação"
     blocked_status:  # CVM registry SIT_EMISSOR
@@ -132,7 +130,7 @@ sectors:
   FINANCIAL:
     # Banks and insurers: no EBITDA, net debt, ROIC, EV/EBIT, current ratio or cash flow
     warning: "análise parcial — setor financeiro"
-    eliminatory: [E1, E2, E4, E5]
+    eliminatory: [E1, E2, E5]
     quality:
       - { key: roe_5y, label: "ROE médio 5a", bad: 0.10, good: 0.20, weight: 45 }
       - { key: cagr_earnings_5y, label: "CAGR lucro 5a", bad: 0.05, good: 0.15, weight: 20, if_invalid: zero }

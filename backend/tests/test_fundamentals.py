@@ -11,7 +11,7 @@ import pytest
 
 from app.fundamentals import service
 from app.fundamentals.cvm_parser import CapitalComposition, parse_capital, parse_document
-from app.fundamentals.indicators import compute
+from app.fundamentals.indicators import apply_year_prices, compute
 from app.fundamentals.shares import ShareCount, from_b3, from_cvm
 from app.market_data.base import DailyBar
 from app.rules.engine import classify_sector
@@ -374,3 +374,44 @@ def test_ingest_and_analyze_cemig(session_factory):
 def test_unknown_ticker(session_factory):
     with session_factory() as session, pytest.raises(service.UnknownTickerError):
         service.fundamentals_for(session, "HGLG11", None, None)
+
+
+def test_display_only_indicators():
+    r = run()
+    # Revenue TTM = 800 + 1500 − 700 = 1600 ; EBIT TTM 330 ; EBITDA 435 ; market cap 2300 ; EV = 2300 + 300
+    assert r.value("revenue_ttm") == D(1600)
+    assert r.value("ev") == D(2600)
+    assert r.value("ev_ebitda") == D(2600) / D(435)
+    assert r.value("p_ebit") == D(2300) / D(330)
+    assert r.value("psr") == D(2300) / D(1600)
+    assert r.value("p_assets") == D(2300) / D(6400)
+    # No dividends in the ITR: the 12 months fall back to the last DFP (100 / 100 shares = 1,00)
+    assert r.value("dps_12m") == D(1)
+    assert r.value("dy_12m") == D(1) / D(23)
+    assert r.value("net_margin") == D(230) / D(1600)
+    assert r.value("ebit_margin") == D(330) / D(1600)
+    assert r.value("ebitda_margin") == D(435) / D(1600)
+    assert r.value("roa") == D(230) / D(6400)
+    assert r.value("asset_turnover") == D("0.25")
+    assert r.value("net_debt_equity") == D(300) / D(1600)
+    assert r.value("net_debt_ebit") == D(300) / D(330)
+    assert r.value("liabilities_assets") == D("0.75")  # (6400 − 1600) / 6400
+
+
+def test_history_by_year_and_trailing_twelve_months():
+    r = run()
+    assert [h.label for h in r.history] == ["2020", "2021", "2022", "2023", "2024", "2025", "12M"]
+    first, y2021, y2025, ttm = r.history[0], r.history[1], r.history[5], r.history[6]
+    assert first.roe == D("0.1")  # no year before: ending equity
+    assert y2021.roe == D(120) / D(1050)  # average equity (1100 + 1000) / 2
+    assert (y2025.eps, y2025.bvps, y2025.dps) == (D(2), D(15), D(1))  # per current share (100)
+    assert y2025.net_margin == D(200) / D(1500)
+    assert y2025.net_debt_ebitda == D("0.75")  # (400 − 100) / (300 + 100)
+    assert y2025.payout == D("0.5")
+    assert (ttm.year, ttm.revenue, ttm.eps, ttm.price, ttm.pe) == (None, D(1600), D("2.3"), D(23), D(10))
+    assert ttm.dy == D(1) / D(23)
+
+    apply_year_prices(r, {2025: D(20), 2024: D(18)})
+    assert (y2025.price, y2025.pe, y2025.pb, y2025.dy) == (D(20), D(10), D(20) / D(15), D("0.05"))
+    assert r.history[3].price is None and r.history[3].pe is None  # 2023: no December close cached
+    assert ttm.price == D(23)  # the trailing 12 months keep the current price

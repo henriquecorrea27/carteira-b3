@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.fundamentals import service as fundamentals
+from app.fundamentals.indicators import apply_year_prices
 from app.market_data.base import MarketDataError
 from app.models import AnalysisSnapshot, CompanyTicker, PriceHistory, Transaction
 from app.portfolio.engine import build_portfolio
@@ -19,7 +20,10 @@ from app.rules.technical import Technical, compute_technical
 from app.schemas.analysis import analysis_details
 
 log = logging.getLogger(__name__)
-CHART_DAYS = 730  # also the history kept for the 200-day SMA (needs ~290 calendar days)
+CHART_DAYS = 730  # default chart window (the 200-day SMA needs ~290 calendar days)
+HISTORY_DAYS = (
+    6 * 365 + 31
+)  # synced once a day: year-end closes of the indicator history (6 DFPs) and the 5y chart
 
 # Ticker → day its history was re-synced with the provider (once a day per process is enough)
 _synced: dict[str, date] = {}
@@ -37,6 +41,9 @@ def analyze(
 ) -> TickerAnalysis:
     today = today or date.today()
     tf = fundamentals.fundamentals_for(session, ticker, market, events, today)
+    sync_history(session, tf.ticker, market, today)
+    years = [row.year for row in tf.result.history if row.year is not None]
+    apply_year_prices(tf.result, fundamentals.year_end_prices(session, tf.ticker, years))
     cfg = load_rules()
     technical = technical_for(session, tf.ticker, market, today, cfg)
     analysis = evaluate(tf.result, cfg, technical.score if technical else None)
@@ -45,7 +52,7 @@ def analyze(
     return result
 
 
-def sync_history(session: Session, ticker: str, market, today: date, days: int = CHART_DAYS) -> None:
+def sync_history(session: Session, ticker: str, market, today: date, days: int = HISTORY_DAYS) -> None:
     """Fetches the last `days` of daily bars once a day per ticker: fills gaps (history older than the
     ~2 months cached for the liquidity) and re-syncs the split-adjusted closes. Failure keeps the cache."""
     if market is None or _synced.get(ticker) == today:
@@ -189,7 +196,7 @@ def price_bars(
 ) -> list[Bar]:
     """Daily bars for the chart, split-adjusted (same basis as the SMA of the chart analysis)."""
     today = today or date.today()
-    sync_history(session, ticker, market, today, max(days, CHART_DAYS))
+    sync_history(session, ticker, market, today, max(days, HISTORY_DAYS))
     fundamentals.ensure_recent_prices(session, market, [ticker], today)
     rows = session.scalars(
         select(PriceHistory)

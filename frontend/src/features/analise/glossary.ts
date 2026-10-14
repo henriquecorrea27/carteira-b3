@@ -95,6 +95,103 @@ export const INDICATOR_TERMS: Record<string, Term> = {
     title: "Margem de segurança de Graham",
     text: "Distância entre o preço justo de Graham e o preço atual. Positiva = ação abaixo do preço justo. Só exibida: não entra na nota, porque repete o P/L e o P/VP.",
   },
+  // Display-only indicators (indicator panel)
+  dy_12m: {
+    title: "DY dos últimos 12 meses",
+    text: "Dividendos + JCP pagos nos últimos 12 meses (fluxo de caixa da CVM) por ação ÷ preço atual. Mostra o que a ação rendeu em proventos no último ano; a nota usa a média de 5 anos, mais estável.",
+  },
+  dps_12m: {
+    title: "Proventos por ação (12 meses)",
+    text: "Dividendos + JCP pagos nos últimos 12 meses ÷ número de ações atual.",
+  },
+  eps: {
+    title: "LPA (lucro por ação)",
+    text: "Lucro dos últimos 12 meses atribuído aos controladores ÷ número de ações (sem as de tesouraria).",
+  },
+  bvps: {
+    title: "VPA (valor patrimonial por ação)",
+    text: "Patrimônio líquido dos controladores no último balanço ÷ número de ações (sem as de tesouraria).",
+  },
+  ev_ebitda: {
+    title: "EV/EBITDA",
+    text: "Valor da firma ÷ EBITDA dos últimos 12 meses. Como o EV/EBIT, mas soma de volta a depreciação: bom para comparar empresas com muitos ativos físicos. Quanto menor, mais barato.",
+  },
+  p_ebit: {
+    title: "P/EBIT",
+    text: "Valor de mercado ÷ lucro operacional (EBIT) dos últimos 12 meses. Parecido com o P/L, mas antes de juros e impostos.",
+  },
+  psr: {
+    title: "P/Receita (PSR)",
+    text: "Valor de mercado ÷ receita líquida dos últimos 12 meses. Útil quando o lucro está deprimido; compare só com empresas do mesmo setor (as margens mudam muito).",
+  },
+  p_assets: {
+    title: "P/Ativo",
+    text: "Valor de mercado ÷ ativo total do último balanço: quanto a bolsa paga por cada R$ 1 de ativos da empresa.",
+  },
+  net_margin: {
+    title: "Margem líquida (12 meses)",
+    text: "Lucro líquido ÷ receita líquida dos últimos 12 meses. A nota usa a média de 5 anos.",
+  },
+  ebit_margin: {
+    title: "Margem EBIT",
+    text: "Lucro operacional (EBIT) ÷ receita líquida dos últimos 12 meses: quanto sobra da operação antes de juros e impostos.",
+  },
+  ebitda_margin: {
+    title: "Margem EBITDA",
+    text: "EBITDA ÷ receita líquida dos últimos 12 meses: a geração de caixa da operação para cada R$ 100 vendidos.",
+  },
+  roa: {
+    title: "ROA (retorno sobre o ativo)",
+    text: "Lucro dos últimos 12 meses ÷ ativo total. Mostra quanto a empresa lucra com tudo o que tem, independente de como se financia.",
+  },
+  asset_turnover: {
+    title: "Giro do ativo",
+    text: "Receita dos últimos 12 meses ÷ ativo total: quantas vezes por ano a empresa “gira” os ativos em vendas.",
+  },
+  net_debt_equity: {
+    title: "Dívida líquida / patrimônio",
+    text: "Dívida líquida (empréstimos e debêntures − caixa) ÷ patrimônio dos controladores. Negativo = mais caixa do que dívida.",
+  },
+  net_debt_ebit: {
+    title: "Dívida líquida / EBIT",
+    text: "Quantos anos de lucro operacional (EBIT) seriam necessários para pagar a dívida líquida.",
+  },
+  liabilities_assets: {
+    title: "Passivo / ativo",
+    text: "Parte dos ativos financiada por terceiros (tudo o que a empresa deve, não só dívida bancária) ÷ ativo total.",
+  },
+  market_cap: {
+    title: "Valor de mercado",
+    text: "Quanto a bolsa paga pela empresa inteira hoje: ações de cada classe (sem tesouraria) × o preço da classe.",
+  },
+  ev: {
+    title: "Valor da firma (EV)",
+    text: "Valor de mercado + dívida líquida + participação dos minoritários: o preço para comprar o negócio inteiro, assumindo a dívida.",
+  },
+  net_debt: {
+    title: "Dívida líquida",
+    text: "Empréstimos, financiamentos e debêntures (curto e longo prazo) − caixa e aplicações. Arrendamentos (IFRS 16) não entram. Negativa = caixa líquido.",
+  },
+  revenue_ttm: {
+    title: "Receita líquida (12 meses)",
+    text: "Soma da receita dos últimos 4 trimestres (balanços da CVM).",
+  },
+  ebitda_ttm: {
+    title: "EBITDA (12 meses)",
+    text: "Lucro operacional (EBIT) + depreciação e amortização dos últimos 4 trimestres. Aproxima o caixa gerado pela operação.",
+  },
+  net_income_ttm: {
+    title: "Lucro líquido (12 meses)",
+    text: "Lucro atribuído aos controladores nos últimos 4 trimestres.",
+  },
+  daily_liquidity: {
+    title: "Liquidez média diária",
+    text: "Volume financeiro médio negociado por dia nos últimos 2 meses. Só informativo (não elimina mais a ação): liquidez baixa dificulta comprar ou vender sem mexer no preço.",
+  },
+  dps_5y: {
+    title: "Proventos por ação médios de 5 anos",
+    text: "Média dos dividendos + JCP pagos por ação nos últimos 5 anos. É a base do DY médio e do preço teto de Bazin.",
+  },
 };
 
 /** Eliminatory rules, by id. */
@@ -102,7 +199,6 @@ export const ELIMINATORY_TERMS: Record<string, string> = {
   E1: "A empresa precisa ter dado lucro em pelo menos 4 dos últimos 5 anos. Prejuízo recorrente elimina.",
   E2: "Patrimônio líquido negativo significa que a empresa deve mais do que tem. Elimina.",
   E3: "Dívida líquida acima do limite em relação ao EBITDA indica endividamento perigoso (geral 3,5; utilities 4,5; cíclicas 3,0 sobre o EBITDA médio de 5 anos). EBITDA negativo também elimina.",
-  E4: "Média do volume negociado por dia nos últimos 2 meses. Abaixo de R$ 2 milhões por dia fica difícil comprar ou vender sem mexer no preço.",
   E5: "Empresa em recuperação judicial ou extrajudicial, falência, liquidação ou com atividades paralisadas é eliminada (cadastro da CVM e lista manual).",
 };
 
@@ -175,5 +271,25 @@ export const TERMS = {
   dps: {
     title: "Proventos por ação",
     text: "Dividendos + JCP pagos no ano (fluxo de caixa da controladora, CVM) ÷ número de ações atual.",
+  },
+  panel: {
+    title: "Indicadores fundamentalistas",
+    text: "Todos os indicadores calculados com os balanços da CVM e a cotação atual. Os que entram na nota mostram o status (bom, médio ou ruim) pela faixa da regra; os demais são só informativos.",
+  },
+  history: {
+    title: "Histórico de indicadores",
+    text: "Valores de cada ano fiscal (balanço anual, DFP) e dos últimos 12 meses. Anos anteriores usam o fechamento de dezembro, ajustado por desdobramentos, e o número de ações atual. A média de 5 anos considera os 5 últimos anos fechados.",
+  },
+  ttm: {
+    title: "12M — últimos 12 meses",
+    text: "Soma dos últimos 4 trimestres (último ITR + último balanço anual − o mesmo período do ano anterior), com o preço atual.",
+  },
+  avg5y: {
+    title: "Média de 5 anos",
+    text: "Média simples dos 5 últimos anos fechados. É a base dos indicadores “médios 5a” usados nas notas (ROE, margem, payout, DY).",
+  },
+  rules: {
+    title: "Análise por regras",
+    text: "As notas de Qualidade e de Preço pontuam cada indicador entre uma faixa ruim e uma ótima. A qualidade usa médias e crescimento de 5 anos (ROE, margem, payout, FCO/lucro, CAGR); o preço usa os múltiplos atuais, o DY médio de 5 anos e a MM200.",
   },
 } satisfies Record<string, Term>;

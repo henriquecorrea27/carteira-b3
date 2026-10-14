@@ -1,0 +1,405 @@
+import * as React from "react";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import type { AssetAnalysis, IndicatorUnit, YearFigures } from "@/api/types";
+import { ChartTooltipBox, Legend, axisProps, gridProps, type TooltipRow } from "@/components/charts/common";
+import { Panel, PanelHeader } from "@/components/ui/misc";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
+import { formatBRL, formatNumber, formatPct, toNumber } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { INDICATOR_TERMS, TERMS, type Term } from "./glossary";
+import { Tip, formatBigBRL, formatValue } from "./shared";
+
+const C1 = "var(--series-1)";
+const C2 = "var(--series-2)";
+const C3 = "var(--series-3)";
+
+const num = (v: string | null) => toNumber(v);
+const yearTitle = (label: string) => (label === "12M" ? "Últimos 12 meses" : `Ano de ${label}`);
+
+/** Axis money: R$ 42 bi · R$ 350 mi */
+function axisBRL(n: number): string {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "−" : "";
+  if (abs >= 1e9) return `${sign}R$ ${formatNumber(abs / 1e9, { maxDecimals: 1 })} bi`;
+  if (abs >= 1e6) return `${sign}R$ ${formatNumber(abs / 1e6, { maxDecimals: 0 })} mi`;
+  if (abs >= 1e3) return `${sign}R$ ${formatNumber(abs / 1e3, { maxDecimals: 0 })} mil`;
+  return `${sign}R$ ${formatNumber(abs, { maxDecimals: 2 })}`;
+}
+
+const pctAxis = (n: number) => `${formatNumber(n, { maxDecimals: 0 })}%`;
+
+function ChartBox({ height = 240, children }: { height?: number; children: React.ReactElement }) {
+  return (
+    <div style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        {children}
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Revenue and net income by year: two series in R$, one axis. */
+function ResultsChart({ history }: { history: YearFigures[] }) {
+  const data = history.map((h) => ({ label: h.label, revenue: num(h.revenue), net_income: num(h.net_income), h }));
+  const hasLoss = data.some((d) => (d.net_income ?? 0) < 0);
+  return (
+    <Panel>
+      <PanelHeader title="Receita e lucro líquido" description="Por ano fiscal e nos últimos 12 meses (12M)." />
+      <div className="px-4 pb-4">
+        <Legend
+          className="mb-3"
+          items={[
+            { label: "Receita líquida", color: C1, shape: "bar" },
+            { label: "Lucro líquido", color: C2, shape: "bar" },
+          ]}
+        />
+        <ChartBox>
+          <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barCategoryGap="22%" barGap={3}>
+            <CartesianGrid {...gridProps} />
+            <XAxis dataKey="label" {...axisProps} dy={6} />
+            <YAxis tickFormatter={axisBRL} {...axisProps} width={78} />
+            {hasLoss && <ReferenceLine y={0} stroke="var(--line-strong)" />}
+            <Tooltip
+              cursor={{ fill: "var(--sunken)", opacity: 0.7 }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const { h } = payload[0].payload as (typeof data)[number];
+                return (
+                  <ChartTooltipBox
+                    title={yearTitle(h.label)}
+                    rows={[
+                      { key: "r", label: "Receita líquida", value: formatBigBRL(h.revenue), color: C1, shape: "bar" },
+                      { key: "l", label: "Lucro líquido", value: formatBigBRL(h.net_income), color: C2, shape: "bar" },
+                    ]}
+                    footer={`Margem líquida ${formatPct(h.net_margin_pct, { decimals: 1 })}`}
+                  />
+                );
+              }}
+            />
+            <Bar dataKey="revenue" fill={C1} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+            <Bar dataKey="net_income" fill={C2} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+          </BarChart>
+        </ChartBox>
+      </div>
+    </Panel>
+  );
+}
+
+const MARGIN_SERIES: { key: "net_margin_pct" | "ebit_margin_pct" | "roe_pct"; label: string; color: string }[] = [
+  { key: "roe_pct", label: "ROE", color: C1 },
+  { key: "ebit_margin_pct", label: "Margem EBIT", color: C2 },
+  { key: "net_margin_pct", label: "Margem líquida", color: C3 },
+];
+
+/** Profitability and margins by year: all in %, one axis. */
+function MarginsChart({ history }: { history: YearFigures[] }) {
+  const series = MARGIN_SERIES.filter((s) => history.some((h) => h[s.key] !== null));
+  const data = history.map((h) => ({ label: h.label, ...Object.fromEntries(series.map((s) => [s.key, num(h[s.key])])), h }));
+  const hasNegative = data.some((d) => series.some((s) => ((d as Record<string, unknown>)[s.key] as number | null ?? 0) < 0));
+  if (series.length === 0) return null;
+  return (
+    <Panel>
+      <PanelHeader title="Rentabilidade e margens" description="ROE sobre o patrimônio médio do ano; margens sobre a receita." />
+      <div className="px-4 pb-4">
+        <Legend className="mb-3" items={series.map((s) => ({ label: s.label, color: s.color }))} />
+        <ChartBox>
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid {...gridProps} />
+            <XAxis dataKey="label" {...axisProps} dy={6} padding={{ left: 12, right: 12 }} />
+            <YAxis tickFormatter={pctAxis} {...axisProps} width={44} />
+            {hasNegative && <ReferenceLine y={0} stroke="var(--line-strong)" />}
+            <Tooltip
+              cursor={{ stroke: "var(--line-strong)", strokeWidth: 1 }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const { h } = payload[0].payload as { h: YearFigures };
+                return (
+                  <ChartTooltipBox
+                    title={yearTitle(h.label)}
+                    rows={series.map((s) => ({ key: s.key, label: s.label, value: formatPct(h[s.key], { decimals: 1 }), color: s.color }))}
+                  />
+                );
+              }}
+            />
+            {series.map((s) => (
+              <Line
+                key={s.key}
+                dataKey={s.key}
+                stroke={s.color}
+                strokeWidth={2}
+                dot={{ r: 4, fill: s.color, stroke: "var(--surface)", strokeWidth: 2 }}
+                activeDot={{ r: 5, stroke: "var(--surface)", strokeWidth: 2 }}
+                connectNulls
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        </ChartBox>
+      </div>
+    </Panel>
+  );
+}
+
+function SingleBars({
+  data,
+  color,
+  format,
+  axisFormat,
+  name,
+}: {
+  data: { label: string; value: number | null; h: YearFigures }[];
+  color: string;
+  format: (h: YearFigures) => TooltipRow[];
+  axisFormat: (n: number) => string;
+  name: string;
+}) {
+  return (
+    <ChartBox height={220}>
+      <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barCategoryGap="28%" accessibilityLayer>
+        <CartesianGrid {...gridProps} />
+        <XAxis dataKey="label" {...axisProps} dy={6} />
+        <YAxis tickFormatter={axisFormat} {...axisProps} width={60} />
+        <Tooltip
+          cursor={{ fill: "var(--sunken)", opacity: 0.7 }}
+          content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const { h } = payload[0].payload as { h: YearFigures };
+            return <ChartTooltipBox title={yearTitle(h.label)} rows={format(h)} />;
+          }}
+        />
+        <Bar dataKey="value" name={name} fill={color} radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={false} />
+      </BarChart>
+    </ChartBox>
+  );
+}
+
+function MiniStat({ label, term, value, sub }: { label: string; term?: Term; value: string; sub?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="flex items-center gap-1 text-sm text-ink-2">
+        {label}
+        {term && <Tip term={term} />}
+      </dt>
+      <dd className="num mt-0.5 text-xl font-semibold tracking-tight">{value}</dd>
+      {sub && <dd className="text-xs text-muted">{sub}</dd>}
+    </div>
+  );
+}
+
+/** Dividends per share and dividend yield by year (two charts: different units never share an axis). */
+function DividendsPanel({ a }: { a: AssetAnalysis }) {
+  const history = a.history.filter((h) => h.dps !== null);
+  if (history.length === 0) return null;
+  const f = (key: string) => a.fundamentals.find((x) => x.key === key) ?? null;
+  const payout = a.indicators.find((i) => i.key === "payout_5y") ?? f("payout_5y");
+  const dps = history.map((h) => ({ label: h.label, value: num(h.dps), h }));
+  const dy = history.map((h) => ({ label: h.label, value: num(h.dy_pct), h }));
+  const rows = (h: YearFigures): TooltipRow[] => [
+    { key: "d", label: "por ação", value: formatBRL(h.dps, { precise: true }), color: C1, shape: "bar" },
+    { key: "y", label: h.year === null ? "DY no preço atual" : "DY no fechamento de dez.", value: formatPct(h.dy_pct, { decimals: 2 }), color: C3, shape: "bar" },
+    { key: "p", label: "payout", value: formatPct(h.payout_pct, { decimals: 0 }), color: "transparent" },
+  ];
+  return (
+    <Panel id="dividendos" className="scroll-mt-20">
+      <PanelHeader
+        title={
+          <span className="flex items-center gap-1.5">
+            Dividendos <Tip term={TERMS.dps} />
+          </span>
+        }
+        description="Dividendos + JCP pagos em cada ano (fluxo de caixa da CVM) ÷ número de ações atual."
+      />
+      <div className="px-4 pb-4">
+        <dl className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <MiniStat label="DY 12 meses" term={INDICATOR_TERMS.dy_12m} value={formatValue(f("dy_12m")?.value ?? null, "pct")} />
+          <MiniStat label="DY médio 5 anos" term={INDICATOR_TERMS.dy_5y} value={formatPct(a.dy_5y_pct, { decimals: 2 })} />
+          <MiniStat label="Payout médio 5 anos" term={INDICATOR_TERMS.payout_5y} value={formatValue(payout?.value ?? null, "pct", 0)} />
+          <MiniStat
+            label="Preço teto Bazin"
+            term={TERMS.bazin}
+            value={formatBRL(a.bazin_ceiling)}
+            sub={a.valuation?.dps_5y ? `média ${formatBRL(a.valuation.dps_5y, { precise: true })} ÷ 6%` : undefined}
+          />
+        </dl>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section aria-label="Proventos por ação por ano">
+            <h3 className="mb-2 text-sm font-medium text-ink-2">Proventos por ação (R$)</h3>
+            <SingleBars data={dps} color={C1} name="Proventos por ação" format={rows} axisFormat={(n) => formatBRL(n)} />
+          </section>
+          <section aria-label="Dividend yield por ano">
+            <h3 className="mb-2 text-sm font-medium text-ink-2">Dividend yield (proventos ÷ cotação de dezembro)</h3>
+            <SingleBars data={dy} color={C3} name="Dividend yield" format={rows} axisFormat={pctAxis} />
+          </section>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+type Row = { label: string; key: keyof YearFigures; unit: IndicatorUnit; avg?: boolean; term?: Term };
+
+const SECTIONS: { title: string; rows: Row[] }[] = [
+  {
+    title: "Valuation",
+    rows: [
+      { label: "P/L", key: "pe", unit: "x", avg: true, term: INDICATOR_TERMS.pe },
+      { label: "P/VP", key: "pb", unit: "x", avg: true, term: INDICATOR_TERMS.pb },
+      { label: "Dividend yield", key: "dy_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.dy_12m },
+      { label: "Cotação (dezembro)", key: "price", unit: "brl" },
+      { label: "LPA", key: "eps", unit: "brl", avg: true, term: INDICATOR_TERMS.eps },
+      { label: "VPA", key: "bvps", unit: "brl", term: INDICATOR_TERMS.bvps },
+      { label: "Proventos por ação", key: "dps", unit: "brl", avg: true, term: TERMS.dps },
+    ],
+  },
+  {
+    title: "Resultados",
+    rows: [
+      { label: "Receita líquida", key: "revenue", unit: "brl", avg: true },
+      { label: "EBITDA", key: "ebitda", unit: "brl", avg: true, term: INDICATOR_TERMS.ebitda_ttm },
+      { label: "Lucro líquido", key: "net_income", unit: "brl", avg: true },
+      { label: "Margem EBIT", key: "ebit_margin_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.ebit_margin },
+      { label: "Margem líquida", key: "net_margin_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.net_margin },
+    ],
+  },
+  {
+    title: "Rentabilidade",
+    rows: [
+      { label: "ROE", key: "roe_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.roe },
+      { label: "ROIC", key: "roic_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.roic },
+    ],
+  },
+  {
+    title: "Endividamento",
+    rows: [
+      { label: "Dívida líquida", key: "net_debt", unit: "brl", term: INDICATOR_TERMS.net_debt },
+      { label: "Dív. líquida / EBITDA", key: "net_debt_ebitda", unit: "x", avg: true, term: INDICATOR_TERMS.net_debt_ebitda },
+      { label: "Liquidez corrente", key: "current_ratio", unit: "x", avg: true, term: INDICATOR_TERMS.current_ratio },
+      { label: "Patrimônio líquido", key: "equity", unit: "brl" },
+    ],
+  },
+  {
+    title: "Caixa e proventos",
+    rows: [
+      { label: "Fluxo de caixa operacional", key: "operating_cash_flow", unit: "brl", avg: true },
+      { label: "Capex", key: "capex", unit: "brl", avg: true },
+      { label: "Proventos pagos", key: "dividends_paid", unit: "brl", avg: true },
+      { label: "Payout", key: "payout_pct", unit: "pct", avg: true, term: INDICATOR_TERMS.payout_5y },
+    ],
+  },
+];
+
+/** Banks and insurers: their cash flows and EBIT/EBITDA do not mean the same as in other companies. */
+const BANK_HIDDEN = new Set<keyof YearFigures>(["ebitda", "ebit_margin_pct", "roic_pct", "net_debt", "net_debt_ebitda", "current_ratio", "operating_cash_flow", "capex"]);
+
+function cell(value: string | number | null, unit: IndicatorUnit): string {
+  return formatValue(value, unit, unit === "pct" ? 1 : 2);
+}
+
+/** Average of the last 5 closed years (at least 3 with data), like the "médio 5a" indicators of the rules. */
+function avg5(history: YearFigures[], key: keyof YearFigures): number | null {
+  const values = history
+    .filter((h) => h.year !== null)
+    .slice(-5)
+    .map((h) => toNumber(h[key] as string | null))
+    .filter((v): v is number => v !== null);
+  return values.length >= 3 ? values.reduce((s, v) => s + v, 0) / values.length : null;
+}
+
+/** Indicators by year (columns), like a stock site's history table, plus the 5-year average. */
+function HistoryTable({ history, financial }: { history: YearFigures[]; financial: boolean }) {
+  const sections = SECTIONS.map((s) => ({
+    ...s,
+    rows: s.rows.filter((r) => !(financial && BANK_HIDDEN.has(r.key)) && history.some((h) => h[r.key] !== null)),
+  })).filter((s) => s.rows.length > 0);
+  const sticky = "sticky left-0 z-[1] bg-surface";
+  return (
+    <Panel id="historico" className="scroll-mt-20">
+      <PanelHeader
+        title={
+          <span className="flex items-center gap-1.5">
+            Histórico de indicadores <Tip term={TERMS.history} />
+          </span>
+        }
+        description="Anos fiscais (balanço anual da CVM), últimos 12 meses e a média dos 5 últimos anos fechados."
+      />
+      <Table className="text-sm">
+        <THead>
+          <TR className="bg-surface-2">
+            <TH className={cn(sticky, "bg-surface-2")}>Indicador</TH>
+            {history.map((h) => (
+              <TH key={h.label} numeric>
+                {h.label === "12M" ? (
+                  <span className="inline-flex items-center gap-1">
+                    12M <Tip term={TERMS.ttm} side="bottom" />
+                  </span>
+                ) : (
+                  h.label
+                )}
+              </TH>
+            ))}
+            <TH numeric className="border-l border-line">
+              <span className="inline-flex items-center gap-1">
+                Média 5A <Tip term={TERMS.avg5y} side="left" />
+              </span>
+            </TH>
+          </TR>
+        </THead>
+        <TBody>
+          {sections.map((s) => (
+            <React.Fragment key={s.title}>
+              <TR className="bg-surface-2/60">
+                <TD colSpan={history.length + 2} className="h-8 text-xs font-semibold uppercase tracking-wider text-muted">
+                  {s.title}
+                </TD>
+              </TR>
+              {s.rows.map((r) => {
+                const avg = r.avg ? avg5(history, r.key) : null;
+                return (
+                  <TR key={r.key}>
+                    <TD className={cn(sticky, "font-medium")}>
+                      <span className="inline-flex items-center gap-1">
+                        {r.label}
+                        {r.term && <Tip term={r.term} side="right" />}
+                      </span>
+                    </TD>
+                    {history.map((h) => {
+                      const v = h[r.key] as string | null;
+                      const n = toNumber(v);
+                      return (
+                        <TD key={h.label} numeric className={cn("num", v === null && "text-muted", n !== null && n < 0 && "text-down")}>
+                          {cell(v, r.unit)}
+                        </TD>
+                      );
+                    })}
+                    <TD numeric className="num border-l border-line font-semibold">
+                      {r.avg ? cell(avg, r.unit) : <span className="font-normal text-muted">—</span>}
+                    </TD>
+                  </TR>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </TBody>
+      </Table>
+      <p className="px-4 py-3 text-xs text-muted">
+        Valores por ação usam o número de ações atual; P/L, P/VP e DY dos anos anteriores usam o último fechamento de dezembro (ajustado por desdobramentos e
+        bonificações). A coluna 12M usa o preço atual.
+      </p>
+    </Panel>
+  );
+}
+
+/** Results, margins, dividends and the indicator history: everything by year. */
+export function HistorySection({ a }: { a: AssetAnalysis }) {
+  if (a.history.length === 0) return null;
+  return (
+    <>
+      <div id="resultados" className="grid scroll-mt-20 gap-5 lg:grid-cols-2">
+        <ResultsChart history={a.history} />
+        <MarginsChart history={a.history} />
+      </div>
+      <DividendsPanel a={a} />
+      <HistoryTable history={a.history} financial={a.special_sector === "FINANCIAL"} />
+    </>
+  );
+}

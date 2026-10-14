@@ -225,6 +225,49 @@ export interface Valuation {
   dps_by_year: { year: number; dps: Decimal }[];
 }
 
+/** Any computed indicator, scored or not (indicator panel). Percentages in points. */
+export interface FundamentalValue {
+  key: string;
+  label: string;
+  value: Decimal | null;
+  unit: IndicatorUnit;
+  note: string | null;
+}
+
+/**
+ * One column of the indicator history: a fiscal year or the trailing 12 months ("12M").
+ * Per-share figures use the current share count; past multiples use the December close (split-adjusted).
+ * Percentages in points.
+ */
+export interface YearFigures {
+  label: string;
+  year: number | null;
+  period_end: ISODate;
+  revenue: Decimal | null;
+  ebit: Decimal | null;
+  ebitda: Decimal | null;
+  net_income: Decimal | null;
+  equity: Decimal | null;
+  net_debt: Decimal | null;
+  dividends_paid: Decimal | null;
+  operating_cash_flow: Decimal | null;
+  capex: Decimal | null;
+  eps: Decimal | null;
+  bvps: Decimal | null;
+  dps: Decimal | null;
+  net_margin_pct: Decimal | null;
+  ebit_margin_pct: Decimal | null;
+  roe_pct: Decimal | null;
+  roic_pct: Decimal | null;
+  net_debt_ebitda: Decimal | null;
+  current_ratio: Decimal | null;
+  payout_pct: Decimal | null;
+  price: Decimal | null;
+  pe: Decimal | null;
+  pb: Decimal | null;
+  dy_pct: Decimal | null;
+}
+
 /** Chart analysis (F8): price vs. the 200-day SMA (daily, split-adjusted). Percentages in points. */
 export interface TechnicalAnalysis {
   /** 0–100; null when there is not enough history (the price score uses the fundamentals only). */
@@ -269,6 +312,10 @@ export interface AssetAnalysis {
   technical: TechnicalAnalysis | null;
   eliminatory: EliminatoryCheck[];
   indicators: Indicator[];
+  /** Every computed indicator (scored or not); empty for asset classes without rules. */
+  fundamentals: FundamentalValue[];
+  /** Oldest year first; "12M" last when there is a quarterly statement after the last DFP. */
+  history: YearFigures[];
   graham_fair_price: Decimal | null;
   graham_margin_pct: Decimal | null;
   bazin_ceiling: Decimal | null;

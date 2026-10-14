@@ -56,6 +56,40 @@ class Indicator:
 
 
 @dataclass
+class YearFigures:
+    """One column of the indicator history: a fiscal year (DFP) or the trailing 12 months ("12M").
+    Per-share figures use the CURRENT share count (like the Bazin average), so splits do not distort them."""
+
+    label: str
+    year: int | None  # None for the trailing 12 months
+    period_end: date
+    revenue: Decimal | None = None
+    ebit: Decimal | None = None
+    ebitda: Decimal | None = None
+    net_income: Decimal | None = None  # attributable to the controlling shareholders
+    equity: Decimal | None = None
+    net_debt: Decimal | None = None
+    dividends_paid: Decimal | None = None
+    operating_cash_flow: Decimal | None = None
+    capex: Decimal | None = None
+    eps: Decimal | None = None
+    bvps: Decimal | None = None
+    dps: Decimal | None = None
+    net_margin: Decimal | None = None
+    ebit_margin: Decimal | None = None
+    roe: Decimal | None = None
+    roic: Decimal | None = None
+    net_debt_ebitda: Decimal | None = None
+    current_ratio: Decimal | None = None
+    payout: Decimal | None = None
+    # Year-end close (split-adjusted) and the multiples on it, filled by `apply_year_prices`
+    price: Decimal | None = None
+    pe: Decimal | None = None
+    pb: Decimal | None = None
+    dy: Decimal | None = None
+
+
+@dataclass
 class FundamentalsResult:
     special_sector: str | None  # FINANCIAL | UTILITY | CYCLICAL | None (general), see app.rules.engine
     indicators: dict[str, Indicator]
@@ -75,6 +109,7 @@ class FundamentalsResult:
     shares_outstanding: Decimal | None = None  # excluding treasury shares
     # Dividends + JCP paid per year / current shares
     dps_by_year: list[tuple[int, Decimal]] = field(default_factory=list)
+    history: list[YearFigures] = field(default_factory=list)  # oldest first; "12M" last when there is an ITR
 
     def value(self, key: str) -> Decimal | None:
         return self.indicators[key].value
@@ -433,6 +468,80 @@ def compute(
     add("bazin_price", "Preço teto Bazin", avg_dps / BAZIN_YIELD if avg_dps is not None else None, "brl")
     add("daily_liquidity", "Liquidez média diária (2 meses)", daily_liquidity, "brl")
 
+    # Display-only indicators (no rule uses them): the full panel of the analysis screen
+    revenue_ttm, _ = book.ttm("revenue")
+    dividends_ttm, _ = book.ttm("dividends_paid")
+    assets = bal.total_assets if bal else None
+    positive = lambda v: v is not None and v > 0  # noqa: E731
+
+    add("net_debt", "Dívida líquida", net_debt, "brl")
+    add("ev", "Valor da firma (EV)", ev, "brl")
+    add("ev_ebitda", "EV/EBITDA", _div(ev, ebitda) if positive(ebitda) else None, "x",
+        "EBITDA ≤ 0" if ebitda is not None and ebitda <= 0 else None)  # fmt: skip
+    add("p_ebit", "P/EBIT", _div(market_cap, ebit_ttm) if positive(ebit_ttm) else None, "x",
+        "EBIT ≤ 0" if ebit_ttm is not None and ebit_ttm <= 0 else None)  # fmt: skip
+    add("psr", "P/Receita (PSR)", _div(market_cap, revenue_ttm) if positive(revenue_ttm) else None, "x")
+    add("p_assets", "P/Ativo", _div(market_cap, assets) if positive(assets) else None, "x")
+    dps_ttm = _div(dividends_ttm, outstanding)
+    add("dps_12m", "Proventos por ação (12 meses)", dps_ttm, "brl")
+    dy_note = "proventos pagos nos últimos 12 meses (fluxo de caixa CVM)" if dps_ttm is not None else None
+    add("dy_12m", "DY 12 meses", _div(dps_ttm, price), "pct", dy_note)
+    add("revenue_ttm", "Receita líquida (12 meses)", revenue_ttm, "brl")
+    add("ebitda_ttm", "EBITDA (12 meses)", ebitda, "brl")
+    add("net_income_ttm", "Lucro líquido (12 meses)", ni_ttm, "brl")
+    add("net_margin", "Margem líquida", _div(ni_ttm, revenue_ttm) if positive(revenue_ttm) else None, "pct")
+    add("ebit_margin", "Margem EBIT", _div(ebit_ttm, revenue_ttm) if positive(revenue_ttm) else None, "pct")
+    add("ebitda_margin", "Margem EBITDA", _div(ebitda, revenue_ttm) if positive(revenue_ttm) else None, "pct")
+    add("roa", "ROA", _div(ni_ttm, assets) if positive(assets) else None, "pct")
+    add("asset_turnover", "Giro do ativo", _div(revenue_ttm, assets) if positive(assets) else None, "x")
+    add(
+        "net_debt_equity",
+        "Dívida líquida / patrimônio",
+        _div(net_debt, eq_now) if positive(eq_now) else None,
+        "x",
+    )
+    add(
+        "net_debt_ebit",
+        "Dívida líquida / EBIT",
+        _div(net_debt, ebit_ttm) if positive(ebit_ttm) else None,
+        "x",
+    )
+    liabilities = assets - bal.equity if positive(assets) and bal.equity is not None else None
+    add("liabilities_assets", "Passivo / ativo", _div(liabilities, assets), "pct")
+
+    history = _history(book, outstanding)
+    if book.last_quarter is not None:
+        history.append(
+            YearFigures(
+                label="12M",
+                year=None,
+                period_end=book.last_quarter.period_end,
+                revenue=revenue_ttm,
+                ebit=ebit_ttm,
+                ebitda=ebitda,
+                net_income=ni_ttm,
+                equity=eq_now,
+                net_debt=net_debt,
+                dividends_paid=dividends_ttm,
+                operating_cash_flow=fco_ttm,
+                capex=capex_ttm,
+                eps=lpa,
+                bvps=vpa,
+                dps=dps_ttm,
+                net_margin=out["net_margin"].value,
+                ebit_margin=out["ebit_margin"].value,
+                roe=out["roe"].value,
+                roic=roic,
+                net_debt_ebitda=out["net_debt_ebitda"].value,
+                current_ratio=out["current_ratio"].value,
+                payout=_div(dividends_ttm, ni_ttm) if positive(ni_ttm) else None,
+                price=price,
+                pe=out["pe"].value,
+                pb=out["pb"].value,
+                dy=out["dy_12m"].value,
+            )
+        )
+
     profitable = sum(
         1 for y in last5 if y.net_income_controlling is not None and y.net_income_controlling > 0
     )
@@ -453,4 +562,62 @@ def compute(
         equity_now=eq_now,
         shares_outstanding=outstanding,
         dps_by_year=dps_by_year,
+        history=history,
     )
+
+
+def _history(book: _Book, outstanding: Decimal | None) -> list[YearFigures]:
+    """One column per DFP (oldest first). ROE uses the average equity with the year before when available."""
+    rows = []
+    for i, y in enumerate(book.annual):
+        before = book.annual[i - 1] if i > 0 else None
+        ni, rev, eq = y.net_income_controlling, y.revenue, y.equity_controlling
+        avg_eq = (
+            (eq + before.equity_controlling) / 2
+            if eq is not None and before and before.equity_controlling is not None
+            else eq
+        )
+        net_debt = y.gross_debt - y.cash if y.gross_debt is not None and y.cash is not None else None
+        ebitda = y.ebit + y.d_and_a if y.ebit is not None and y.d_and_a is not None else None
+        invested = y.equity + y.gross_debt - y.cash if y.equity is not None and net_debt is not None else None
+        rows.append(
+            YearFigures(
+                label=str(y.period_end.year),
+                year=y.period_end.year,
+                period_end=y.period_end,
+                revenue=rev,
+                ebit=y.ebit,
+                ebitda=ebitda,
+                net_income=ni,
+                equity=eq,
+                net_debt=net_debt,
+                dividends_paid=y.dividends_paid,
+                operating_cash_flow=y.operating_cash_flow,
+                capex=y.capex,
+                eps=_div(ni, outstanding),
+                bvps=_div(eq, outstanding),
+                dps=_div(y.dividends_paid, outstanding),
+                net_margin=_div(ni, rev) if rev and rev > 0 else None,
+                ebit_margin=_div(y.ebit, rev) if rev and rev > 0 else None,
+                roe=_div(ni, avg_eq) if avg_eq and avg_eq > 0 else None,
+                roic=y.ebit * (ONE - TAX_ROIC) / invested
+                if y.ebit is not None and invested and invested > 0
+                else None,
+                net_debt_ebitda=_div(net_debt, ebitda) if ebitda and ebitda > 0 else None,
+                current_ratio=_div(y.current_assets, y.current_liabilities),
+                payout=_div(y.dividends_paid, ni) if ni and ni > 0 else None,
+            )
+        )
+    return rows
+
+
+def apply_year_prices(result: FundamentalsResult, prices: dict[int, Decimal]) -> None:
+    """P/L, P/VP and DY of each past year on its year-end close (split-adjusted, per current share)."""
+    for row in result.history:
+        if row.year is None:
+            continue  # the trailing 12 months already use the current price
+        price = prices.get(row.year)
+        row.price = price
+        row.pe = _div(price, row.eps) if row.eps and row.eps > 0 else None
+        row.pb = _div(price, row.bvps) if row.bvps and row.bvps > 0 else None
+        row.dy = _div(row.dps, price) if price else None

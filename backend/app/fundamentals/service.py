@@ -458,6 +458,28 @@ def fundamentals_for(
     )
 
 
+def year_end_prices(session: Session, ticker: str, years: list[int]) -> dict[int, Decimal]:
+    """Last split-adjusted close of December of each year (per share for units), for the indicator history."""
+    link = session.get(CompanyTicker, ticker)
+    out = {}
+    for year in years:
+        close = session.scalar(
+            select(PriceHistory.close_adjusted)
+            .where(
+                PriceHistory.ticker == ticker,
+                PriceHistory.date >= date(year, 12, 1),
+                PriceHistory.date <= date(year, 12, 31),
+            )
+            .order_by(PriceHistory.date.desc())
+            .limit(1)
+        )
+        if close is not None:
+            if link is not None and link.share_class == "UNIT":
+                close = _unit_to_share_price(close, link.unit_composition)
+            out[year] = close
+    return out
+
+
 def _unit_to_share_price(price: Decimal | None, composition: str | None) -> Decimal | None:
     if price is None or not composition:
         return price

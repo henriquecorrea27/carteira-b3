@@ -75,10 +75,12 @@ def weights(rules):
 
 def test_approved_weights_v2():
     """CLAUDE.md §5: weights approved by the owner on 10/10/2026 (analyst proposal v2) and the chart analysis
-    specified on 13/10/2026 (v3). Changing them needs an explicit decision — update this test, the YAML and
-    CLAUDE.md together."""
+    specified on 13/10/2026 (v3); daily-liquidity eliminatory removed on 14/10/2026 (v4). Changing them needs
+    an explicit decision — update this test, the YAML and CLAUDE.md together."""
     cfg = load_rules()
-    assert cfg["version"] == 3
+    assert cfg["version"] == 4
+    assert list(cfg["eliminatory"]) == ["E1", "E2", "E3", "E5"]
+    assert cfg["sectors"]["FINANCIAL"]["eliminatory"] == ["E1", "E2", "E5"]
     assert weights(cfg["quality"]) == {
         "roic": 20, "roe_5y": 10, "net_margin_5y": 5, "net_debt_ebitda": 20, "current_ratio": 5,
         "cagr_revenue_5y": 10, "cagr_earnings_5y": 10, "cash_conversion_5y": 10, "earnings_drops_5y": 5,
@@ -253,7 +255,6 @@ def test_avoid_when_quality_below_50():
         ({"profitable": 3}, "E1"),
         ({"bvps": "-1"}, "E2"),
         ({"net_debt_ebitda": "3.6"}, "E3"),
-        ({"daily_liquidity": "1999999"}, "E4"),
         ({"issuer_status": "EM RECUPERAÇÃO JUDICIAL OU EQUIVALENTE"}, "E5"),
         ({"issuer_status": "FALIDA"}, "E5"),
         ({"issuer": "AMBP"}, "E5"),  # manual list: judicial recovery not yet in the CVM registry
@@ -265,6 +266,13 @@ def test_any_failed_eliminatory_means_avoid_and_caps_the_score(kwargs, failed):
     assert [c.id for c in a.eliminatory if c.passed is False] == [failed]
     assert a.main_reason.startswith({c.id: c.label for c in a.eliminatory}[failed])
     assert a.score_final == 30.0  # would be ~100 without the veto cap
+
+
+def test_low_liquidity_no_longer_eliminates():
+    # E4 (daily liquidity ≥ R$ 2 mi) was removed on 14/10/2026: the liquidity is shown, never a veto
+    a = evaluate(fundamentals_result(daily_liquidity="150000"))
+    assert "E4" not in {c.id for c in a.eliminatory}
+    assert a.decision == Decision.BUY
 
 
 def test_e5_without_registry_data_does_not_eliminate():
@@ -327,7 +335,7 @@ def test_financial_sector_uses_its_own_set():
     assert [i.key for i in a.indicators] == [
         "roe_5y", "cagr_earnings_5y", "cagr_book_5y", "equity_to_assets", "payout_5y", "pe", "dy_5y", "pb",
     ]  # fmt: skip
-    assert [c.id for c in a.eliminatory] == ["E1", "E2", "E4", "E5"]
+    assert [c.id for c in a.eliminatory] == ["E1", "E2", "E5"]
     assert "análise parcial — setor financeiro" in a.warnings
     assert a.decision == Decision.BUY
     # Insurers (regular chart of accounts): PL / ativo total does not apply
@@ -421,13 +429,19 @@ def test_analysis_endpoint_explains_the_decision(client, ingested):
     assert body["ticker"] == "CMIG4"
     assert body["decision"] in ("BUY", "WAIT", "AVOID")
     assert body["special_sector"] == "UTILITY"
-    assert {e["id"] for e in body["eliminatory"]} == {"E1", "E2", "E3", "E4", "E5"}
+    assert {e["id"] for e in body["eliminatory"]} == {"E1", "E2", "E3", "E5"}
     assert len(body["indicators"]) == 13
     assert all({"range_label", "points", "status", "weight"} <= set(i) for i in body["indicators"])
     assert body["last_dfp"] == "2025-12-31"
     v = body["valuation"]
     assert v["eps"] is not None and v["bvps"] is not None and v["shares"] is not None
     assert len(v["dps_by_year"]) == 5
+    # Indicator panel (scored or not) and the history by year, oldest first
+    keys = {f["key"] for f in body["fundamentals"]}
+    assert {"pe", "ev_ebitda", "dy_12m", "roa", "net_debt_equity", "daily_liquidity"} <= keys
+    labels = [h["label"] for h in body["history"]]
+    assert labels[-1] == "12M" and labels[:-1] == sorted(labels[:-1])
+    assert body["history"][-2]["revenue"] is not None
     with ingested() as session:
         snaps = session.query(AnalysisSnapshot).all()
         assert [(s.ticker, s.decision) for s in snaps] == [("CMIG4", body["decision"])]

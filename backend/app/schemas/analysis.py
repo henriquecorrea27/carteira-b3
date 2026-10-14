@@ -49,6 +49,47 @@ class ValuationOut(BaseModel):
     dps_by_year: list[DividendYearOut]
 
 
+class FundamentalOut(_Attrs):
+    """Every computed indicator, scored or not (the indicator panel of the analysis screen)."""
+
+    key: str
+    label: str
+    value: Number | None
+    unit: str  # pct (fraction) | x | brl | count
+    note: str | None
+
+
+class YearOut(_Attrs):
+    """One column of the indicator history (fiscal year or the trailing 12 months)."""
+
+    label: str
+    year: int | None
+    period_end: dt.date
+    revenue: Money | None
+    ebit: Money | None
+    ebitda: Money | None
+    net_income: Money | None
+    equity: Money | None
+    net_debt: Money | None
+    dividends_paid: Money | None
+    operating_cash_flow: Money | None
+    capex: Money | None
+    eps: Number | None
+    bvps: Number | None
+    dps: Number | None
+    net_margin: Number | None
+    ebit_margin: Number | None
+    roe: Number | None
+    roic: Number | None
+    net_debt_ebitda: Number | None
+    current_ratio: Number | None
+    payout: Number | None
+    price: Number | None
+    pe: Number | None
+    pb: Number | None
+    dy: Number | None
+
+
 class TechnicalOut(_Attrs):
     """Chart analysis (F8): price vs. the 200-day SMA of the split-adjusted daily closes."""
 
@@ -86,6 +127,8 @@ class AnalysisOut(BaseModel):
     main_reason: str | None
     eliminatory: list[EliminatoryOut]
     indicators: list[IndicatorScoreOut]
+    fundamentals: list[FundamentalOut]
+    history: list[YearOut]
     graham_price: Number | None
     graham_margin: Number | None
     bazin_price: Number | None
@@ -127,6 +170,8 @@ def analysis_out(ta) -> AnalysisOut:
         main_reason=a.main_reason,
         eliminatory=[EliminatoryOut.model_validate(c) for c in a.eliminatory],
         indicators=[IndicatorScoreOut.model_validate(i) for i in a.indicators],
+        fundamentals=[FundamentalOut.model_validate(i) for i in r.indicators.values()],
+        history=[YearOut.model_validate(y) for y in r.history],
         graham_price=r.value("graham_price"),
         graham_margin=r.value("graham_margin"),
         bazin_price=r.value("bazin_price"),

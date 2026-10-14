@@ -296,12 +296,6 @@ def _eliminatory(fundamentals: FundamentalsResult, cfg: dict, enabled: list[str]
         else:
             passed, label = None, None
         checks.append(EliminatoryCheck("E3", r["label"], f"≤ {_num(limit, 1)}", label, passed))
-    if "E4" in enabled:
-        r = rules["E4"]
-        liquidity = fundamentals.value("daily_liquidity")
-        label = fmt(liquidity, "brl") if liquidity is not None else None
-        passed = None if liquidity is None else float(liquidity) >= r["min_brl"]
-        checks.append(EliminatoryCheck("E4", r["label"], f"≥ {fmt(r['min_brl'], 'brl')}", label, passed))
     if "E5" in enabled and "E5" in rules:
         r = rules["E5"]
         blocked = {_plain(s) for s in r.get("blocked_status") or []}

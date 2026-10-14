@@ -1,8 +1,8 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Ban, CheckCircle2, CircleDashed, CircleMinus, Search, TriangleAlert, XCircle } from "lucide-react";
+import { Ban, CheckCircle2, CircleDashed, Search } from "lucide-react";
 import { useAnalysis, useAssetSearch, usePositions, usePriceBars } from "@/api/hooks";
-import type { AssetAnalysis, Indicator, IndicatorStatus } from "@/api/types";
+import type { AssetAnalysis, Indicator } from "@/api/types";
 import { Legend } from "@/components/charts/common";
 import { PriceChart } from "@/components/charts/PriceChart";
 import { AssetMark, DecisionBadge, Delta, ScoreMeter } from "@/components/domain";
@@ -17,14 +17,9 @@ import { sma } from "@/lib/indicators";
 import { cn } from "@/lib/utils";
 import { QueryError } from "../shared";
 import { ELIMINATORY_TERMS, INDICATOR_TERMS, TERMS, type Term } from "./glossary";
-
-function Tip({ term, side }: { term: Term; side?: "top" | "bottom" | "left" | "right" }) {
-  return (
-    <InfoTip title={term.title} side={side}>
-      {term.text}
-    </InfoTip>
-  );
-}
+import { HistorySection } from "./HistorySection";
+import { IndicatorPanel } from "./IndicatorPanel";
+import { STATUS, Tip, formatBig, formatBigBRL } from "./shared";
 
 function TickerSearch({ autoFocus }: { autoFocus?: boolean }) {
   const navigate = useNavigate();
@@ -93,13 +88,6 @@ function TickerSearch({ autoFocus }: { autoFocus?: boolean }) {
     </div>
   );
 }
-
-const STATUS: Record<IndicatorStatus, { label: string; icon: typeof CheckCircle2; className: string }> = {
-  GOOD: { label: "Bom", icon: CheckCircle2, className: "text-up" },
-  MID: { label: "Médio", icon: TriangleAlert, className: "text-warn" },
-  BAD: { label: "Ruim", icon: XCircle, className: "text-down" },
-  NA: { label: "Sem dados", icon: CircleMinus, className: "text-muted" },
-};
 
 function formatIndicator(i: Indicator): string {
   if (i.value === null) return "—";
@@ -273,24 +261,6 @@ function PriceScale({ a }: { a: AssetAnalysis }) {
       </dl>
     </div>
   );
-}
-
-/** Big amounts in words: 10,2 bi · 350,4 mi */
-function formatBig(value: Numeric): string {
-  const n = toNumber(value);
-  if (n === null) return "—";
-  const abs = Math.abs(n);
-  if (abs >= 1e9) return `${formatNumber(n / 1e9, { maxDecimals: 2 })} bi`;
-  if (abs >= 1e6) return `${formatNumber(n / 1e6, { maxDecimals: 1 })} mi`;
-  if (abs >= 1e3) return `${formatNumber(n / 1e3, { maxDecimals: 1 })} mil`;
-  return formatNumber(n, { maxDecimals: 0 });
-}
-
-/** −R$ 102,9 mi */
-function formatBigBRL(value: Numeric): string {
-  const n = toNumber(value);
-  if (n === null) return "—";
-  return `${n < 0 ? "−" : ""}R$ ${formatBig(Math.abs(n))}`;
 }
 
 function CalcRow({ label, term, value, detail }: { label: string; term?: Term; value: string; detail?: string }) {
@@ -544,10 +514,10 @@ function TechnicalPanel({ a }: { a: AssetAnalysis }) {
 function PricePanel({ ticker }: { ticker: string }) {
   const bars = usePriceBars(ticker);
   const [mode, setMode] = React.useState<"area" | "candles">("area");
-  const [range, setRange] = React.useState<"6m" | "1y" | "2y">("1y");
+  const [range, setRange] = React.useState<"6m" | "1y" | "2y" | "5y">("1y");
   const [data, smaLine] = React.useMemo(() => {
     if (!bars.data) return [[], []];
-    const days = range === "6m" ? 126 : range === "1y" ? 252 : bars.data.length;
+    const days = { "6m": 126, "1y": 252, "2y": 504, "5y": bars.data.length }[range];
     // SMA over the whole history, then cut to the visible range (the first 199 days have no SMA)
     const values = sma(bars.data.map((b) => Number(b.close)), SMA_DAYS);
     const line = bars.data.flatMap((b, i) => (values[i] === null ? [] : [{ time: b.time, value: values[i]! }]));
@@ -555,12 +525,13 @@ function PricePanel({ ticker }: { ticker: string }) {
     return [visible, line.filter((p) => p.time >= visible[0]?.time)];
   }, [bars.data, range]);
   return (
-    <Panel>
+    <Panel id="cotacao" className="scroll-mt-20">
       <PanelHeader
         title="Cotação"
+        description="Fechamento diário ajustado por desdobramentos e bonificações."
         actions={
           <>
-            <Segmented aria-label="Período do gráfico" size="sm" value={range} onChange={setRange} options={[{ value: "6m", label: "6M" }, { value: "1y", label: "1A" }, { value: "2y", label: "2A" }]} />
+            <Segmented aria-label="Período do gráfico" size="sm" value={range} onChange={setRange} options={[{ value: "6m", label: "6M" }, { value: "1y", label: "1A" }, { value: "2y", label: "2A" }, { value: "5y", label: "5A" }]} />
             <Segmented aria-label="Tipo de gráfico" size="sm" value={mode} onChange={setMode} options={[{ value: "area", label: "Linha" }, { value: "candles", label: "Candles" }]} />
           </>
         }
@@ -578,6 +549,36 @@ function PricePanel({ ticker }: { ticker: string }) {
         )}
       </div>
     </Panel>
+  );
+}
+
+const SECTIONS = [
+  { id: "indicadores", label: "Indicadores" },
+  { id: "cotacao", label: "Cotação" },
+  { id: "resultados", label: "Resultados", history: true },
+  { id: "dividendos", label: "Dividendos", history: true },
+  { id: "historico", label: "Histórico", history: true },
+  { id: "regras", label: "Análise por regras" },
+];
+
+/** In-page shortcuts to the sections of a long analysis. */
+function SectionNav({ hasHistory }: { hasHistory: boolean }) {
+  return (
+    <nav aria-label="Seções da análise" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+      {SECTIONS.filter((s) => hasHistory || !s.history).map((s) => (
+        <a
+          key={s.id}
+          href={`#${s.id}`}
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          className="shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-sm text-ink-2 hover:border-line-strong hover:text-ink"
+        >
+          {s.label}
+        </a>
+      ))}
+    </nav>
   );
 }
 
@@ -690,6 +691,23 @@ function AnalysisView({ ticker }: { ticker: string }) {
         </Callout>
       )}
 
+      {isStock && <SectionNav hasHistory={a.history.length > 0} />}
+      {isStock && a.fundamentals.length > 0 && <IndicatorPanel a={a} />}
+      <PricePanel ticker={a.ticker} />
+      {isStock && <HistorySection a={a} />}
+
+      {isStock && (
+        <header id="regras" className="scroll-mt-20 border-t border-line pt-6">
+          <h2 className="flex items-center gap-1.5 text-xl font-semibold tracking-tight">
+            Análise por regras <Tip term={TERMS.rules} />
+          </h2>
+          <p className="mt-1 max-w-3xl text-ink-2">
+            Qualidade com médias e crescimento de 5 anos (ROE, margem, payout, FCO/lucro, CAGR); preço com os múltiplos atuais, o DY médio de 5 anos e a MM200.
+            Cada indicador é pontuado entre uma faixa ruim e uma ótima.
+          </p>
+        </header>
+      )}
+
       {isStock ? (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="flex min-w-0 flex-col gap-5">
@@ -721,11 +739,9 @@ function AnalysisView({ ticker }: { ticker: string }) {
         </div>
       ) : null}
 
-      <PricePanel ticker={a.ticker} />
-
       <p className="text-sm text-muted">
         Dados contábeis: {a.fundamentals_ref ?? "—"}
-        {a.fundamentals_date && ` (data-base ${formatDate(a.fundamentals_date)})`} · Cotação de {formatDate(a.price_date)} · Regras v3 (pesos por setor + MM200, revisão em 30/04/2027).
+        {a.fundamentals_date && ` (data-base ${formatDate(a.fundamentals_date)})`} · Cotação de {formatDate(a.price_date)} · Regras v4 (pesos por setor + MM200, revisão em 30/04/2027).
       </p>
     </div>
   );

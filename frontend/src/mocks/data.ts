@@ -11,6 +11,7 @@ import type {
   DividendType,
   EliminatoryCheck,
   EquityPoint,
+  FundamentalValue,
   ImportPreview,
   ImportPreviewRow,
   Indicator,
@@ -21,6 +22,7 @@ import type {
   ReturnPoint,
   RulesSnapshot,
   Transaction,
+  YearFigures,
 } from "@/api/types";
 import { formatMultiple, formatPct } from "@/lib/format";
 
@@ -437,6 +439,8 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
     score_technical: null,
     technical_weight: 0,
     technical: null,
+    fundamentals: [],
+    history: [],
   };
   if (known.asset_class !== "STOCK") {
     return {
@@ -539,7 +543,6 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
             passed: ticker === "KLBN11" ? false : ndeValue === null ? null : ndeValue <= (utility ? 4.5 : 3.5),
           },
         ]),
-    { id: "E4", label: "Liquidez média diária", rule: "≥ R$ 2 milhões", value_label: "R$ 214,6 mi", passed: true },
   ];
   const failed = eliminatory.some((e) => e.passed === false);
   const sq = q.score;
@@ -581,6 +584,8 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
     graham_margin_pct: d2(((graham - price) / price) * 100),
     bazin_ceiling: d2(bazin),
     dy_5y_pct: d2((proventos5y / price) * 100),
+    fundamentals: mockFundamentals(price, lpa, vpa, proventos5y, indicators),
+    history: mockHistory(price, lpa, vpa, proventos5y, rand),
     valuation: {
       eps: lpa.toFixed(4),
       bvps: vpa.toFixed(4),
@@ -595,6 +600,71 @@ export function buildAnalysis(ticker: string): AssetAnalysis | null {
   };
 }
 
+
+/** Indicator panel for the demo: the scored indicators plus display-only ones derived from the same profile. */
+function mockFundamentals(price: number, lpa: number, vpa: number, dps: number, scored: Indicator[]): FundamentalValue[] {
+  const shares = 1e9;
+  const cap = price * shares;
+  const extra: FundamentalValue[] = [
+    { key: "dy_12m", label: "DY 12 meses", value: d2(((dps * 1.1) / price) * 100), unit: "pct", note: null },
+    { key: "pe", label: "P/L", value: d2(price / lpa), unit: "x", note: null },
+    { key: "pb", label: "P/VP", value: d2(price / vpa), unit: "x", note: null },
+    { key: "eps", label: "LPA (TTM)", value: lpa.toFixed(4), unit: "brl", note: null },
+    { key: "bvps", label: "VPA", value: vpa.toFixed(4), unit: "brl", note: null },
+    { key: "roe", label: "ROE (TTM)", value: d2((lpa / vpa) * 100), unit: "pct", note: null },
+    { key: "market_cap", label: "Valor de mercado", value: d2(cap), unit: "brl", note: null },
+    { key: "ev", label: "Valor da firma (EV)", value: d2(cap * 1.25), unit: "brl", note: null },
+    { key: "net_debt", label: "Dívida líquida", value: d2(cap * 0.25), unit: "brl", note: null },
+    { key: "ev_ebitda", label: "EV/EBITDA", value: d2((price / lpa) * 0.55), unit: "x", note: null },
+    { key: "net_margin", label: "Margem líquida", value: "12.40", unit: "pct", note: null },
+    { key: "ebit_margin", label: "Margem EBIT", value: "18.70", unit: "pct", note: null },
+    { key: "roa", label: "ROA", value: "6.10", unit: "pct", note: null },
+    { key: "net_debt_equity", label: "Dívida líquida / patrimônio", value: "0.45", unit: "x", note: null },
+    { key: "daily_liquidity", label: "Liquidez média diária (2 meses)", value: "85400000", unit: "brl", note: null },
+  ];
+  const keys = new Set(extra.map((f) => f.key));
+  return [...extra, ...scored.filter((i) => !keys.has(i.key)).map(({ key, label, value, unit, note }) => ({ key, label, value, unit, note }))];
+}
+
+/** Six fiscal years plus the trailing 12 months, growing ~8% a year with some noise. */
+function mockHistory(price: number, lpa: number, vpa: number, dps: number, rand: () => number): YearFigures[] {
+  const labels = ["2020", "2021", "2022", "2023", "2024", "2025", "12M"];
+  return labels.map((label, i) => {
+    const g = Math.pow(1.08, i - 6) * (0.9 + rand() * 0.2);
+    const eps = lpa * g;
+    const p = price * Math.pow(1.06, i - 6) * (0.85 + rand() * 0.3);
+    const revenue = eps * 1e9 * 8;
+    const yDps = dps * g;
+    return {
+      label,
+      year: label === "12M" ? null : Number(label),
+      period_end: label === "12M" ? "2026-06-30" : `${label}-12-31`,
+      revenue: d2(revenue),
+      ebit: d2(revenue * 0.19),
+      ebitda: d2(revenue * 0.24),
+      net_income: d2(eps * 1e9),
+      equity: d2(vpa * g * 1e9),
+      net_debt: d2(revenue * 0.3),
+      dividends_paid: d2(yDps * 1e9),
+      operating_cash_flow: d2(eps * 1e9 * 1.2),
+      capex: d2(eps * 1e9 * 0.5),
+      eps: eps.toFixed(4),
+      bvps: (vpa * g).toFixed(4),
+      dps: yDps.toFixed(4),
+      net_margin_pct: d2(12.5 * (0.9 + rand() * 0.2)),
+      ebit_margin_pct: d2(19 * (0.9 + rand() * 0.2)),
+      roe_pct: d2((eps / (vpa * g)) * 100),
+      roic_pct: d2(14 * (0.9 + rand() * 0.2)),
+      net_debt_ebitda: d2(1.25),
+      current_ratio: d2(1.4),
+      payout_pct: d2((yDps / eps) * 100),
+      price: d2(p),
+      pe: d2(p / eps),
+      pb: d2(p / (vpa * g)),
+      dy_pct: d2((yDps / p) * 100),
+    };
+  });
+}
 
 function describe(i: Indicator): string {
   const v = i.value === null ? "—" : i.unit === "pct" ? formatPct(i.value, { decimals: 1 }) : formatMultiple(i.value);

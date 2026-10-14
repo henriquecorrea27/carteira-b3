@@ -269,6 +269,9 @@ function fundamentalsRef(a: W.Analysis): string | null {
   return parts.length ? parts.join(" + ") : null;
 }
 
+/** Five years of daily bars for the price chart (the backend keeps ~6 years for the indicator history). */
+const PRICE_HISTORY_DAYS = 5 * 365 + 2;
+
 function toAnalysis(a: W.Analysis): AssetAnalysis {
   return {
     ticker: a.ticker,
@@ -314,6 +317,16 @@ function toAnalysis(a: W.Analysis): AssetAnalysis {
       max_points: String(i.weight),
       status: i.status,
       note: i.note,
+    })),
+    fundamentals: a.fundamentals.map((f) => ({ ...f, value: f.unit === "pct" ? toPct(f.value) : f.value })),
+    history: a.history.map(({ net_margin, ebit_margin, roe, roic, payout, dy, ...h }) => ({
+      ...h,
+      net_margin_pct: toPct(net_margin),
+      ebit_margin_pct: toPct(ebit_margin),
+      roe_pct: toPct(roe),
+      roic_pct: toPct(roic),
+      payout_pct: toPct(payout),
+      dy_pct: toPct(dy),
     })),
     graham_fair_price: a.graham_price,
     graham_margin_pct: toPct(a.graham_margin),
@@ -410,7 +423,7 @@ export const api = {
   getPriceBars: (ticker: string): Promise<PriceBar[]> =>
     USE_MOCKS
       ? mock((s) => s.priceBars(ticker))
-      : http.get<W.PriceBar[]>(`/prices/${encodeURIComponent(ticker)}`).then((bars) =>
+      : http.get<W.PriceBar[]>(`/prices/${encodeURIComponent(ticker)}`, { days: PRICE_HISTORY_DAYS }).then((bars) =>
           bars.map((b) => ({
             time: b.date,
             open: b.open ?? b.close,

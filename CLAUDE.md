@@ -296,14 +296,15 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 
 ---
 
-## 5. Motor de Regras — v3 (pesos por setor + MM200)
+## 5. Motor de Regras — v4 (pesos por setor + MM200, sem eliminatório de liquidez)
 
 > Pesos, faixas e travas propostos pelo agente `analista-investimentos` (`.claude/agents/`) e **aprovados pelo
 > usuário em 10/10/2026**. **Não alterar pesos, faixas ou limites sem decisão explícita do usuário.**
 > A implementação lê tudo de `rules_config/stocks.yaml`. Qualquer mudança aprovada deve ser feita no YAML **e** nesta seção
 > (e no teste `test_approved_weights_v2`).
 > A análise gráfica (F8, MM200) foi especificada pelo usuário em 13/10/2026 e entra como componente da nota de Preço
-> com peso 0,25 (seção 5.6). Versão do YAML: 3.
+> com peso 0,25 (seção 5.6). O eliminatório de liquidez diária (antigo E4) foi **removido pelo usuário em 14/10/2026**:
+> a liquidez continua exibida e serve de desempate, mas não elimina. Versão do YAML: 4.
 > **Revisão:** 30/04/2027 (após a temporada de DFP 2026), ou antes se a Selic sair de 11–17%, o IPCA 12m passar de 6%,
 > mudar a tributação de dividendos/JCP, mudar o layout da CVM ou mais de 10% da carteira ficar inconclusiva.
 
@@ -329,7 +330,6 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 | E1 | Lucro líquido positivo nos últimos 5 anos | ≥ 4 de 5 anos |
 | E2 | Patrimônio líquido | > 0 |
 | E3 | Dívida líquida / EBITDA (EBITDA ≤ 0 reprova) | ≤ 3,5 (utility ≤ 4,5; cíclica ≤ 3,0 sobre o EBITDA médio de 5 anos) |
-| E4 | Liquidez média diária | ≥ R$ 2 milhões |
 | E5 | Emissor sem recuperação judicial/extrajudicial, falência, liquidação ou paralisação | `SIT_EMISSOR` do cadastro da CVM + lista manual por ticker (AMBP: RJ desde 10/2025, a CVM ainda mostra "fase operacional") |
 
 ### 5.3 Classificação de setor
@@ -349,7 +349,7 @@ payout 5a 5 (ótimo 25–80%, zero fora de 0–100%).
 **GERAL — Preço:** EV/EBIT 30 (15 → 6) · P/L 20 (20 → 7) · DY médio 5a 20 (2% → 8%) · P/VP 10 (3,0 → 1,0) ·
 FCF yield 20 (2% → 10%) · margem de Graham 0 (só exibida).
 
-**FINANCEIRO** (aviso "análise parcial"; eliminatórios E1, E2, E4, E5) — Qualidade: ROE 5a 45 (10% → 20%) ·
+**FINANCEIRO** (aviso "análise parcial"; eliminatórios E1, E2, E5) — Qualidade: ROE 5a 45 (10% → 20%) ·
 CAGR lucro 20 (5% → 15%) · CAGR do patrimônio 15 (4% → 12%) · PL/ativo total 10 (6% → 10%, **só bancos**) ·
 payout 10 (ótimo 25–90%, zero fora de 0–110%). Preço: P/L 40 (15 → 6) · DY 40 (3% → 9%) · P/VP 20 (2,5 → 0,9).
 
@@ -387,7 +387,7 @@ Especificado pelo usuário em 13/10/2026. A **MM200 aritmética (simples) do gr�
 - A parte técnica nunca anula um eliminatório nem a trava de prejuízo (Preço ≤ 40 com LPA ≤ 0), aplicada depois da mistura.
 - Só **ações**. FIIs, ETFs e BDRs: **sem regras por enquanto** (a MM200 para eles ainda será estudada).
 
-Implementação: `app/rules/technical.py` (puro) e `rules.service.technical_for`. O histórico de 730 dias é sincronizado
+Implementação: `app/rules/technical.py` (puro) e `rules.service.technical_for`. O histórico de ~6 anos é sincronizado
 com o yfinance uma vez por dia por ticker (`sync_history`), reescrevendo o `close_adjusted` dos dias já em cache
 (um desdobramento depois do cache muda o ajustado); o `close` bruto fica intacto para o livro. O gráfico de cotação
 usa as mesmas barras ajustadas e desenha a MM200; a tela mostra o quadro "Análise gráfica — MM200" com a conta.
@@ -404,6 +404,24 @@ Para cada ativo pesquisado:
 - Um **"i"** ao lado de cada termo (indicadores, eliminatórios, notas, colunas) explica o que ele quer dizer ao passar o
   mouse (textos em `frontend/src/features/analise/glossary.ts`).
 - Data-base dos dados (último DFP/ITR usado e data da cotação).
+
+**Tela de Análise (14/10/2026, estilo Investidor10)**, nesta ordem:
+1. Cabeçalho (preço, decisão, notas) e atalhos para as seções.
+2. **Painel de indicadores** por tema: valuation, endividamento, eficiência, rentabilidade, crescimento e dividendos,
+   tamanho e liquidez. Inclui indicadores só informativos (`app/fundamentals/indicators.py`, nenhuma regra os usa):
+   DY 12m, EV/EBITDA, P/EBIT, P/Receita, P/Ativo, margens EBITDA/EBIT/líquida (12m), ROA, giro do ativo, dívida
+   líquida/PL e /EBIT, passivo/ativo, valor da firma, receita/EBITDA/lucro 12m. Os que entram na nota mostram o status.
+   Setor financeiro esconde os que não se aplicam (fluxo de caixa, EBIT, EBITDA, receita); os "médios 5a" de P/L, EV/EBIT
+   e dívida só aparecem nas cíclicas.
+3. Cotação (até 5 anos) com a MM200.
+4. Gráficos anuais: receita e lucro; ROE e margens; proventos por ação e DY (cada medida no seu gráfico, um eixo só).
+5. **Histórico de indicadores**: uma coluna por DFP + "12M" + média dos 5 últimos anos fechados (a mesma base dos
+   indicadores "médios 5a" das regras).
+6. Análise por regras: Qualidade, Preço fundamentalista, MM200, eliminatórios, Graham e Bazin.
+
+A API manda `fundamentals` (todos os indicadores) e `history` (`YearFigures`: anos de DFP + 12M). Valores por ação
+usam o número de ações atual; P/L, P/VP e DY dos anos passados usam o último fechamento de dezembro ajustado
+(`fundamentals.service.year_end_prices` + `indicators.apply_year_prices`).
 
 **Explicabilidade é requisito:** nenhuma decisão sem mostrar o porquê.
 
@@ -506,4 +524,5 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 - [x] Criar o **webhook do Discord** e colocar a URL no `.env`.
 - [x] Pesos das regras (seção 5, v2 aprovada em 10/10/2026; revisão em 30/04/2027).
 - [x] Especificação da análise gráfica (F8, MM200 — 13/10/2026).
+- [x] Liquidez diária fora dos eliminatórios (14/10/2026, regras v4).
 - [ ] Análise gráfica para FIIs, ETFs e BDRs (a estudar).
