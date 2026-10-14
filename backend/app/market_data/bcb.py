@@ -4,6 +4,7 @@ windows per request, so long ranges are split.
 A window with no published value yet (weekend, holiday, today before publication) comes back as
 {"erro": {"statusCode": 404, ...}}, sometimes with HTTP 404 and sometimes with HTTP 200."""
 
+import time
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -16,6 +17,9 @@ CDI_SERIES = 12
 # The API caps daily series at 10-year windows and gets slow on long ones; 1-year windows are reliable
 _MAX_WINDOW = timedelta(days=365)
 _ATTEMPTS = 3
+# The SGS gateway often answers 502/503/504 for a few seconds; those are retried, other codes are not
+_TRANSIENT = {500, 502, 503, 504}
+_BACKOFF_SECONDS = 2.0
 
 
 def parse_sgs(payload: list[dict]) -> list[tuple[date, Decimal]]:
@@ -25,8 +29,9 @@ def parse_sgs(payload: list[dict]) -> list[tuple[date, Decimal]]:
 class BCBRatesProvider:
     name = "bcb"
 
-    def __init__(self, client: httpx.Client | None = None):
+    def __init__(self, client: httpx.Client | None = None, backoff: float = _BACKOFF_SECONDS):
         self._client = client or httpx.Client(timeout=60)
+        self._backoff = backoff
 
     def cdi_daily(self, start: date, end: date) -> list[tuple[date, Decimal]]:
         out: list[tuple[date, Decimal]] = []
@@ -42,10 +47,13 @@ class BCBRatesProvider:
         for attempt in range(1, _ATTEMPTS + 1):
             try:
                 response = self._client.get(SGS_URL.format(series=series), params=params)
-                break
             except httpx.HTTPError as err:
                 if attempt == _ATTEMPTS:
                     raise MarketDataError(f"BCB indisponível: {err}") from err
+            else:
+                if response.status_code not in _TRANSIENT or attempt == _ATTEMPTS:
+                    break
+            time.sleep(self._backoff * attempt)
         # SGS answers 404 when the window has no business days yet (e.g. today before publication)
         if response.status_code == 404:
             return []

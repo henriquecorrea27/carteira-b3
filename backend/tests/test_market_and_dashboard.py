@@ -203,7 +203,30 @@ def test_unadjust_rebuilds_raw_close_before_a_split():
 
 
 def _bcb(handler):
-    return BCBRatesProvider(httpx.Client(transport=httpx.MockTransport(handler)))
+    return BCBRatesProvider(httpx.Client(transport=httpx.MockTransport(handler)), backoff=0)
+
+
+def test_sgs_gateway_errors_are_retried():
+    calls = []
+
+    def flaky(request):
+        calls.append(request)
+        if len(calls) < 3:
+            return httpx.Response(502)
+        return httpx.Response(200, json=[{"data": "01/10/2026", "valor": "0.055131"}])
+
+    assert _bcb(flaky).cdi_daily(date(2026, 10, 1), date(2026, 10, 1)) == [(date(2026, 10, 1), D("0.055131"))]
+    assert len(calls) == 3
+
+    calls.clear()
+    with pytest.raises(MarketDataError, match="BCB respondeu 502"):
+        _bcb(lambda r: calls.append(r) or httpx.Response(502)).cdi_daily(date(2026, 10, 1), date(2026, 10, 1))
+    assert len(calls) == 3
+
+    calls.clear()
+    with pytest.raises(MarketDataError, match="BCB respondeu 400"):
+        _bcb(lambda r: calls.append(r) or httpx.Response(400)).cdi_daily(date(2026, 10, 1), date(2026, 10, 1))
+    assert len(calls) == 1
 
 
 def test_sgs_not_found_with_http_200_means_no_new_data():
