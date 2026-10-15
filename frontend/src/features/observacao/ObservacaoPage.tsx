@@ -31,6 +31,7 @@ import { Callout, EmptyState, Panel, PanelHeader, Skeleton } from "@/components/
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { formatBRL, formatDate, formatNumber, toNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useActiveProfile } from "@/app/profiles";
 import { DiscordMessage, DispatchRow } from "../relatorio/ReportDialog";
 import { PageTitle, QueryError } from "../shared";
 
@@ -346,20 +347,28 @@ function WatchTable({ w }: { w: Watchlist }) {
 export function ObservacaoPage() {
   const list = useWatchlist();
   const w = list.data;
+  const discord = useActiveProfile().active?.discord !== false;
   const asOf = w?.items.map((i) => i.price_date).filter((d): d is string => Boolean(d)).sort().at(-1);
   return (
     <div className="flex flex-col gap-5">
       <PageTitle
         title="Lista de observação"
         description={
-          <>
-            Ações que você acompanha. Todo dia útil às {w?.report_time ?? "19:00"} o Discord recebe só a posição do preço em relação à MM
-            {w?.sma_days ?? 200}, com destaque para as que mudaram de faixa desde o último aviso.
-          </>
+          discord ? (
+            <>
+              Ações que você acompanha. Todo dia útil às {w?.report_time ?? "19:00"} o Discord recebe só a posição do preço em relação à
+              MM{w?.sma_days ?? 200}, com destaque para as que mudaram de faixa desde o último aviso.
+            </>
+          ) : (
+            <>
+              Ações que você acompanha, com a posição do preço em relação à MM{w?.sma_days ?? 200}. Esta carteira não envia avisos ao
+              Discord: a lista fica só aqui na tela.
+            </>
+          )
         }
-        actions={w && <MessageDialog w={w} />}
+        actions={w && discord && <MessageDialog w={w} />}
       />
-      {w && <ChannelNotice channel={w.channel} />}
+      {w && discord && <ChannelNotice channel={w.channel} />}
       <Panel>
         <PanelHeader title="Adicionar ação" description="Qualquer ativo da B3 com cotação no Yahoo Finance (ações, FIIs, ETFs, BDRs)." />
         <AddForm />

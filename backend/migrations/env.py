@@ -1,36 +1,42 @@
+"""Migrations run on the database of every profile (app.core.profiles): `alembic upgrade head` upgrades all of
+them; `-x profile=<id>` limits to one. Autogenerate compares against the first profile only."""
+
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 import app.models  # noqa: F401  (register models on Base.metadata)
-from app.core.config import get_settings
 from app.core.db import Base
+from app.core.profiles import Profile, primary_profile, select_profiles
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
 
+def _targets() -> list[Profile]:
+    if getattr(config.cmd_opts, "autogenerate", False):
+        return [primary_profile()]
+    return select_profiles(context.get_x_argument(as_dictionary=True).get("profile"))
+
+
 def run_migrations_offline() -> None:
-    context.configure(
-        url=config.get_main_option("sqlalchemy.url"), target_metadata=target_metadata, literal_binds=True
-    )
+    context.configure(url=primary_profile().database_url, target_metadata=target_metadata, literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool
-    )
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
-        with context.begin_transaction():
-            context.run_migrations()
+    for profile in _targets():
+        connectable = create_engine(profile.database_url, poolclass=pool.NullPool)
+        with connectable.connect() as connection:
+            context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+            with context.begin_transaction():
+                context.run_migrations()
+        connectable.dispose()
 
 
 if context.is_offline_mode():

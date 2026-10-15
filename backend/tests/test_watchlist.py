@@ -7,6 +7,7 @@ import pytest
 
 from app.api.portfolio import get_market_provider
 from app.core.config import get_settings
+from app.core.profiles import primary_profile
 from app.main import app
 from app.market_data.base import DailyBar
 from app.models import PriceHistory, ReportDispatch, WatchlistItem
@@ -133,17 +134,17 @@ def test_empty_watchlist_sends_nothing(session_factory):
 
 
 def test_channel_separate_or_shared(monkeypatch):
-    settings = get_settings()
+    settings, p = get_settings(), primary_profile()
     monkeypatch.setattr(settings, "discord_webhook_url", "https://discord.test/main")
     monkeypatch.setattr(settings, "discord_watchlist_webhook_url", "")
-    assert service.watchlist_channel() == "SHARED"
-    assert service.get_watchlist_notifier()._url == "https://discord.test/main"
+    assert service.watchlist_channel(p) == "SHARED"
+    assert service.get_watchlist_notifier(p)._url == "https://discord.test/main"
     monkeypatch.setattr(settings, "discord_watchlist_webhook_url", "https://discord.test/mm200")
-    assert service.watchlist_channel() == "SEPARATE"
-    assert service.get_watchlist_notifier()._url == "https://discord.test/mm200"
+    assert service.watchlist_channel(p) == "SEPARATE"
+    assert service.get_watchlist_notifier(p)._url == "https://discord.test/mm200"
     monkeypatch.setattr(settings, "discord_webhook_url", "")
     monkeypatch.setattr(settings, "discord_watchlist_webhook_url", "")
-    assert (service.watchlist_channel(), service.get_watchlist_notifier()) == (None, None)
+    assert (service.watchlist_channel(p), service.get_watchlist_notifier(p)) == (None, None)
 
 
 # --- API --------------------------------------------------------------------------------------

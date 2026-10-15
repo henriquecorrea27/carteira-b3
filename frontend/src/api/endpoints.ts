@@ -7,6 +7,7 @@
  */
 import { ApiError, http } from "./client";
 import type {
+  Profile,
   AssetAnalysis,
   AssetSearchResult,
   Dividend,
@@ -482,6 +483,11 @@ export const api = {
   sendReport: (): Promise<ReportDispatch> => http.post<ReportDispatch>("/report/send"),
 
   // Watchlist (Discord alert on the price vs. the SMA200). Mocks: an empty list, read-only.
+  getProfiles: (): Promise<Profile[]> =>
+    USE_MOCKS
+      ? Promise.resolve([{ id: "principal", name: "Minha carteira", primary: true, discord: true }])
+      : http.get<Profile[]>("/profiles"),
+
   getWatchlist: (): Promise<Watchlist> =>
     USE_MOCKS
       ? Promise.resolve(MOCK_WATCHLIST)

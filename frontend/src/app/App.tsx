@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
+import { useProfileId } from "@/api/profile";
 import { TooltipProvider } from "@/components/ui/menu";
 import { Skeleton } from "@/components/ui/misc";
 import { AppShell } from "./AppShell";
@@ -25,10 +26,12 @@ function PageFallback() {
 
 export function App() {
   const { resolved } = useTheme();
+  const profile = useProfileId();
   return (
     <TooltipProvider delayDuration={250}>
       <Suspense fallback={null}>
-        <Routes>
+        {/* Keyed by the profile: switching portfolios remounts everything, no state carries over */}
+        <Routes key={profile ?? ""}>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to="/carteira" replace />} />
             <Route path="carteira/:view?" element={<Suspense fallback={<PageFallback />}><CarteiraPage /></Suspense>} />

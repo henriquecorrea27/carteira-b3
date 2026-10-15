@@ -1,9 +1,12 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { FileUp, PenLine, WalletMinimal } from "lucide-react";
 import { usePending, useSummary } from "@/api/hooks";
+import type { PortfolioSummary } from "@/api/types";
+import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
-import { Skeleton } from "@/components/ui/misc";
+import { EmptyState, Panel, Skeleton } from "@/components/ui/misc";
 import { Delta } from "@/components/domain";
-import { formatBRL } from "@/lib/format";
+import { formatBRL, toNumber } from "@/lib/format";
 import { PendingBanner, QueryError, SourceWarnings } from "../shared";
 import { ResumoView } from "./ResumoView";
 import { PosicoesView } from "./PosicoesView";
@@ -16,6 +19,39 @@ const VIEWS: { value: View; label: string }[] = [
   { value: "posicoes", label: "Posições" },
   { value: "rentabilidade", label: "Rentabilidade" },
 ];
+
+/** A portfolio without any operation yet (e.g. a profile just created). */
+function isEmpty(s: PortfolioSummary): boolean {
+  return [s.equity, s.invested, s.realized_pnl, s.dividends_total].every((v) => toNumber(v) === 0);
+}
+
+function EmptyPortfolio() {
+  return (
+    <Panel>
+      <EmptyState
+        icon={WalletMinimal}
+        title="Esta carteira ainda não tem operações"
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button asChild variant="primary">
+              <Link to="/importar">
+                <FileUp /> Importar extratos da B3
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/operacoes">
+                <PenLine /> Lançar operações
+              </Link>
+            </Button>
+          </div>
+        }
+      >
+        Importe os extratos de Negociação e Movimentação da Área do Investidor da B3, ou lance as compras e vendas à mão.
+        Proventos e eventos entram sozinhos depois.
+      </EmptyState>
+    </Panel>
+  );
+}
 
 export function CarteiraPage() {
   const params = useParams();
@@ -64,9 +100,15 @@ export function CarteiraPage() {
       <SourceWarnings warnings={summary.data?.warnings} />
       <PendingBanner items={pending.data} />
 
-      {view === "resumo" && <ResumoView />}
-      {view === "posicoes" && <PosicoesView />}
-      {view === "rentabilidade" && <RentabilidadeView />}
+      {summary.data && isEmpty(summary.data) ? (
+        <EmptyPortfolio />
+      ) : (
+        <>
+          {view === "resumo" && <ResumoView />}
+          {view === "posicoes" && <PosicoesView />}
+          {view === "rentabilidade" && <RentabilidadeView />}
+        </>
+      )}
     </>
   );
 }

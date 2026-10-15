@@ -3,6 +3,7 @@ import { api } from "./endpoints";
 import type { TransactionFilters, TransactionInput } from "./types";
 
 export const queryKeys = {
+  profiles: ["profiles"] as const,
   summary: ["portfolio", "summary"] as const,
   positions: ["portfolio", "positions"] as const,
   pending: ["portfolio", "pending"] as const,
@@ -127,6 +128,9 @@ export function useSendReport() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["report"] }),
   });
 }
+
+export const useProfiles = () =>
+  useQuery({ queryKey: queryKeys.profiles, queryFn: api.getProfiles, staleTime: Infinity });
 
 export const useWatchlist = () => useQuery({ queryKey: queryKeys.watchlist, queryFn: api.getWatchlist });
 export const useWatchlistPreview = (enabled: boolean) =>

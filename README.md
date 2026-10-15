@@ -17,7 +17,7 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
 | F5 — Dados da CVM, ticker ↔ CNPJ, setores, indicadores | ✅ |
 | F6 — Motor de regras, tela de Análise, decisão na carteira, histórico | ✅ |
 | F7 — Relatório diário no Discord | ✅ |
-| F8 — Análise gráfica | ⏳ |
+| F8 — Análise gráfica | ✅ |
 
 ## Requisitos
 
@@ -70,6 +70,20 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
    - **Lista de observação** (aba Observação, ou "Observar" na Análise): ações avisadas só pela distância do preço
      até a MM200, logo depois do relatório. Para um canal próprio, criar outro webhook e colar em
      `DISCORD_WATCHLIST_WEBHOOK_URL` (vazio = mesmo canal do relatório).
+7. (Opcional) **Mais de uma carteira** (ex.: a sua e a de um familiar), totalmente separadas, cada uma no próprio
+   banco. No `backend/.env`:
+   ```
+   PROFILES=eu:Eu,pai:Pai
+   ```
+   A primeira usa o banco de `DATABASE_URL`; as outras, o mesmo servidor com o nome + `_id` (`carteira_pai`).
+   Depois rodar (cria os bancos com o superusuário de `POSTGRES_SUPERUSER_PASSWORD`, aplica as migrações em
+   todos e carrega os dados da CVM nos novos) e reiniciar o app:
+   ```
+   cd backend && uv run python -m app.jobs.setup_profiles
+   ```
+   A troca é pelo seletor ao lado do logo; as outras carteiras ganham uma faixa colorida no topo. O Discord só é
+   enviado para a primeira; as outras são atualizadas pelo mesmo job das 19h. Os jobs rodam para todas as
+   carteiras (`--profile <id>` para uma só) e `alembic upgrade head` migra todos os bancos.
 
 ## Uso diário (atalho)
 
@@ -89,8 +103,11 @@ cd frontend && npm run test
 
 ## API
 
+Com mais de uma carteira, o cabeçalho `X-Profile: <id>` escolhe o banco de cada chamada (sem ele, a primeira).
+
 | Método | Rota | Descrição |
 |---|---|---|
+| GET | `/api/profiles` | Carteiras configuradas (`PROFILES`) |
 | GET | `/api/transactions` | Livro de operações (filtros: `ticker`, `type`, `source`, `date_from`, `date_to`) |
 | POST | `/api/transactions` | Lançamento individual |
 | POST | `/api/transactions/batch` | Lançamento em lote (tudo ou nada; erros apontam a linha) |
@@ -133,5 +150,5 @@ e o histórico dos principais indicadores (tendência de 5 anos, ou tabela ano a
 
 ## Privacidade
 
-Extratos reais, prints e o `.env` nunca vão para o repositório (ver `.gitignore`). As fixtures de teste da B3
+Extratos reais (de qualquer carteira), prints e o `.env` nunca vão para o repositório (ver `.gitignore`). As fixtures de teste da B3
 são sintéticas — mesmo layout dos arquivos reais, carteira fictícia.

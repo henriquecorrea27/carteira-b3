@@ -15,6 +15,7 @@ import {
 import { formatDateTimeShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { usePrivacy } from "./privacy";
+import { ProfileMenu, useActiveProfile } from "./profiles";
 import { useTheme, type ThemePreference } from "./theme";
 
 const TABS = [
@@ -26,7 +27,7 @@ const TABS = [
   { to: "/importar", label: "Importar" },
 ];
 
-function Wordmark() {
+function Wordmark({ compact = false }: { compact?: boolean }) {
   return (
     <NavLink to="/carteira" className="flex items-center gap-2 rounded-md pr-1" aria-label="Carteira B3 — início">
       <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
@@ -35,7 +36,7 @@ function Wordmark() {
         <rect x="14" y="12" width="4" height="13" rx="1" fill="var(--paper)" />
         <rect x="21" y="7" width="4" height="18" rx="1" fill="var(--up)" />
       </svg>
-      <span className="text-lg font-semibold tracking-tight">Carteira B3</span>
+      <span className={cn("text-lg font-semibold tracking-tight", compact && "hidden sm:inline")}>Carteira B3</span>
     </NavLink>
   );
 }
@@ -91,7 +92,7 @@ function RefreshPrices() {
   return (
     <div className="flex items-center gap-3">
       {summary.data?.prices_as_of && (
-        <span className="hidden text-sm text-muted lg:inline">
+        <span className="hidden text-sm text-muted min-[1320px]:inline">
           Cotações de {formatDateTimeShort(summary.data.prices_as_of)}
         </span>
       )}
@@ -104,6 +105,7 @@ function RefreshPrices() {
 }
 
 export function AppShell() {
+  const { active, accent, multiple } = useActiveProfile();
   return (
     <div className="min-h-dvh">
       <a
@@ -112,10 +114,14 @@ export function AppShell() {
       >
         Pular para o conteúdo
       </a>
-      <header className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-6 px-4 sm:px-6">
-          <div className="flex h-14 items-center">
-            <Wordmark />
+      <header
+        className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/80"
+        style={accent ? { boxShadow: `inset 0 3px 0 ${accent}` } : undefined}
+      >
+        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-5 px-4 sm:px-6">
+          <div className="flex h-14 items-center gap-3">
+            <Wordmark compact={multiple} />
+            <ProfileMenu />
           </div>
           <nav aria-label="Seções" className="order-3 -mx-4 w-[calc(100%+2rem)] overflow-x-auto overflow-y-hidden px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:order-none md:mx-0 md:w-auto md:overflow-visible md:px-0">
             <ul className="flex h-11 items-stretch gap-1 md:h-14">
@@ -145,7 +151,7 @@ export function AppShell() {
             )}
             <RefreshPrices />
             <PrivacyToggle />
-            <ReportDialog />
+            {active?.discord !== false && <ReportDialog />}
             <ThemeMenu />
           </div>
         </div>

@@ -1,11 +1,14 @@
+import threading
 from collections.abc import Iterator
 from datetime import datetime
 from decimal import Decimal
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy import DateTime, Numeric, create_engine, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
-from app.core.config import get_settings
+from app.core.profiles import Profile, current_profile, primary_profile
 
 # Quantities can be fractional (bonus shares, fraction auctions); prices need sub-cent precision.
 NUMERIC = Numeric(24, 8)
@@ -22,10 +25,29 @@ class TimestampMixin:
     )
 
 
-engine = create_engine(get_settings().database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+# One engine per profile database, created on first use
+_makers: dict[str, sessionmaker[Session]] = {}
+_makers_lock = threading.Lock()
 
 
-def get_session() -> Iterator[Session]:
-    with SessionLocal() as session:
+def sessionmaker_for(profile: Profile) -> sessionmaker[Session]:
+    with _makers_lock:
+        maker = _makers.get(profile.id)
+        if maker is None:
+            engine = create_engine(profile.database_url, pool_pre_ping=True)
+            maker = _makers[profile.id] = sessionmaker(bind=engine, expire_on_commit=False)
+        return maker
+
+
+def session_for(profile: Profile) -> Session:
+    return sessionmaker_for(profile)()
+
+
+SessionLocal = sessionmaker_for(primary_profile())
+engine = SessionLocal.kw["bind"]
+
+
+def get_session(profile: Annotated[Profile, Depends(current_profile)]) -> Iterator[Session]:
+    """The database of the profile picked in the UI (X-Profile header)."""
+    with session_for(profile) as session:
         yield session

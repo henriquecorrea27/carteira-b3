@@ -68,6 +68,8 @@ cd backend && uv run python -m app.jobs.sync_corporate_events  # proventos e eve
 cd backend && uv run python -m app.jobs.ingest_cvm             # dados da CVM + indicadores (mensal)
 cd backend && uv run python -m app.jobs.daily_analysis         # regras para as ações da carteira (diário)
 cd backend && uv run python -m app.jobs.daily_report           # relatório diário (--dry-run mostra, --now envia já)
+cd backend && uv run python -m app.jobs.setup_profiles         # cria/migra os bancos das carteiras de PROFILES
+# Todos os jobs rodam para todas as carteiras; --profile <id> limita a uma.
 powershell -ExecutionPolicy Bypass -File scripts\register_tasks.ps1  # agenda os jobs no Windows (-Remove desfaz)
 cd frontend && npm run dev                         # UI em http://localhost:5180 (proxy /api → :8000)
 # Uso diário: atalhos "Carteira B3" / "Parar Carteira B3" (scripts/install_shortcuts.ps1). O backend serve o
@@ -89,6 +91,27 @@ cd frontend && npm run dev                         # UI em http://localhost:5180
 - Navegação por **abas no topo** (Carteira, Proventos, Operações, Análise, Observação, Importar).
 - Referência funcional: Investidor10 (prints enviados pelo usuário); visual **mais moderno e minimalista**.
 
+### Carteiras (perfis) — pedido do usuário em 14/10/2026
+Mais de uma carteira no mesmo computador (a do usuário e a do pai), **totalmente separadas**
+(`app/core/profiles.py`). Ainda é usuário único: só o dono usa, neste computador.
+- `PROFILES=eu:Eu,pai:Pai` no `.env` (vazio = uma carteira só, como antes). **Cada carteira tem o próprio banco**:
+  a primeira usa `DATABASE_URL`; as outras, o mesmo servidor com o nome + `_id` (`carteira_pai`). Nada é
+  compartilhado (livro, proventos, decisões, lista de observação, envios); cotações e dados da CVM são buscados de
+  novo em cada banco (os arquivos da CVM ficam em cache no disco para todos). Escolhido no lugar de uma coluna de
+  perfil em cada tabela: uma consulta sem filtro nunca mistura as carteiras.
+- `app.jobs.setup_profiles` cria os bancos que faltam (superusuário `postgres`, `POSTGRES_SUPERUSER_PASSWORD`; o
+  usuário do app não tem CREATEDB), aplica as migrações e carrega a CVM nos novos. `migrations/env.py` migra todos
+  os bancos (`-x profile=<id>` para um; autogenerate compara só com o primeiro).
+- API: cabeçalho `X-Profile` (sem ele, a primeira carteira; id desconhecido → 400). `get_session` abre o banco da
+  carteira; `GET /api/profiles` lista as carteiras. O memo de sincronização de cotações (`rules.service._synced`)
+  é por banco.
+- UI: seletor ao lado do logo (só com mais de uma carteira), guardado no navegador; trocar cancela e limpa o cache
+  do TanStack Query e remonta as telas. As outras carteiras têm uma faixa colorida no topo; Importar mostra
+  "Importando para <nome>"; carteira sem operações mostra o convite para importar ou lançar.
+- **Discord só na primeira carteira** (decisão do usuário: o pai não precisa por enquanto). As outras não têm
+  botão de relatório nem aviso da lista de observação; o job das 19h só as atualiza (cotações → proventos →
+  análise), uma vez por dia útil depois do horário do relatório (`notifications.service.refresh_due`).
+
 ---
 
 ## 2. Regras gerais de código
@@ -100,7 +123,7 @@ cd frontend && npm run dev                         # UI em http://localhost:5180
 - Manter **README.md e CLAUDE.md atualizados** ao final de cada fase.
 - O motor de carteira (`/portfolio`) é a parte mais crítica: **toda regra de cálculo tem teste com caso numérico fechado** antes de ir para a UI.
 - **Nunca adivinhar o layout de arquivos ou de respostas de APIs não documentadas** (exportações B3, endpoints de proventos). Construir parsers a partir de exemplos reais; se não houver, buscar/pedir o exemplo antes de codar.
-- **Privacidade dos dados do usuário:** arquivos reais enviados pelo usuário (extratos B3 etc.) **nunca são commitados** e são **apagados após o uso**. As fixtures em `/tests/fixtures` são **sintéticas**: mesmo layout (colunas, tipos, formatos) do arquivo real, com valores fictícios. Respostas de APIs públicas (B3, CVM) podem ser salvas como fixture.
+- **Privacidade dos dados do usuário:** arquivos reais enviados pelo usuário (extratos B3 etc., de qualquer carteira) **nunca são commitados** e são **apagados após o uso**. As fixtures em `/tests/fixtures` são **sintéticas**: mesmo layout (colunas, tipos, formatos) do arquivo real, com valores fictícios. Respostas de APIs públicas (B3, CVM) podem ser salvas como fixture.
 - Repositório GitHub **privado**. Antes de cada commit, conferir que nada pessoal entra (`.env`, extratos, dumps do banco, dados da carteira).
 - Falha de fonte externa **nunca derruba o app**: registrar, mostrar aviso na UI e seguir com o último dado em cache.
 
@@ -457,6 +480,7 @@ Guardar o histórico diário das decisões (`analysis_snapshots`) para detectar 
 > Versão inicial simples; será aprimorada depois com o usuário.
 
 ### 6.1 Canal
+- Só a primeira carteira (`PROFILES`, seção 1) envia ao Discord.
 - Discord **Webhook** (criado pelo usuário no servidor dele). URL em `DISCORD_WEBHOOK_URL`.
 - Envio via `Notifier` (interface) → `DiscordNotifier`. Respeitar limites do Discord (mensagem até 2.000 caracteres, embeds); dividir em várias mensagens se precisar.
 

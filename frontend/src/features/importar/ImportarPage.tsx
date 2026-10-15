@@ -12,6 +12,7 @@ import { Private } from "@/components/domain";
 import { formatBRL, formatDate, formatQuantity } from "@/lib/format";
 import { IMPORT_STATUS_LABEL, TX_TYPE_LABEL } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { ActiveProfileTag } from "@/app/profiles";
 import { PageTitle } from "../shared";
 
 const STATUS_TONE: Record<ImportRowStatus, "up" | "neutral" | "outline" | "down"> = {
@@ -223,7 +224,11 @@ export function ImportarPage() {
 
   return (
     <>
-      <PageTitle title="Importar" description="Traga as operações e os proventos dos extratos da B3. Você revisa tudo antes de gravar." />
+      <PageTitle
+        title="Importar"
+        description="Traga as operações e os proventos dos extratos da B3. Você revisa tudo antes de gravar."
+        actions={<ActiveProfileTag prefix="Importando para" />}
+      />
       <Steps current={step} />
       {step === 0 && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">

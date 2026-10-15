@@ -366,6 +366,14 @@ export interface ImportResult {
   errors: number;
 }
 
+/** An independent portfolio (its own database on the backend). */
+export interface Profile {
+  id: string;
+  name: string;
+  primary: boolean;
+  discord: boolean; // daily report and watchlist alert (first profile only)
+}
+
 export interface ReportPreview {
   date: ISODate;
   content: string; // Discord-flavoured Markdown, as sent

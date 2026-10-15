@@ -8,6 +8,9 @@ sent at the next run, marked as late.
     uv run python -m app.jobs.daily_report              # scheduled run (catch-up, no duplicates)
     uv run python -m app.jobs.daily_report --dry-run    # print the report and the watchlist without sending
     uv run python -m app.jobs.daily_report --now        # send both now (test), outside the schedule
+
+Runs for every profile (--profile picks one). Discord is configured for the first profile only; the others
+just get the daily refresh, once per business day after the report time.
 """
 
 import argparse
@@ -18,9 +21,11 @@ from logging.handlers import RotatingFileHandler
 from sqlalchemy.orm import Session
 
 from app.core.config import BACKEND_DIR
-from app.core.db import SessionLocal
+from app.core.db import session_for
+from app.core.profiles import Profile
 from app.corporate_events.b3_source import B3CorporateEventsSource
 from app.corporate_events.service import sync
+from app.jobs import add_profile_arg, profiles_for, tag
 from app.market_data.bcb import BCBRatesProvider
 from app.market_data.service import refresh_all
 from app.market_data.yfinance_provider import YFinanceProvider
@@ -68,21 +73,32 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--now", action="store_true", help="envia agora, fora do agendamento (teste)")
     parser.add_argument("--force", action="store_true", help="reenvia mesmo se o relatório do dia já foi")
     parser.add_argument("--no-refresh", action="store_true", help="não atualiza cotações/proventos antes")
+    add_profile_arg(parser)
     args = parser.parse_args(argv)
     _setup_logging()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")  # emojis on the Windows console
 
     now = service.local_now()
-    notifier, watch_notifier = service.get_notifier(), service.get_watchlist_notifier()
     market = YFinanceProvider()
-    with SessionLocal() as session:
+    return max(_run(profile, args, now, market) for profile in profiles_for(args))
+
+
+def _run(profile: Profile, args: argparse.Namespace, now, market) -> int:
+    t = tag(profile)
+    notifier, watch_notifier = service.get_notifier(profile), service.get_watchlist_notifier(profile)
+    with session_for(profile) as session:
         if args.dry_run or args.now:
+            if args.now and notifier is None and not profile.primary:
+                log.info("%ssem Discord neste perfil: nada enviado", t)
+                return 0
             if not args.no_refresh:
                 for error in refresh(session):
-                    log.warning(error)
+                    log.warning("%s%s", t, error)
             day = service.manual_day(now)
             if args.dry_run:
+                if t:
+                    print(f"\n===== {profile.name} =====\n")
                 print(service.compose(session, day, now)[1])
                 if service.has_watchlist(session):
                     print("\n" + service.compose_watchlist(session, day, now, market)[1])
@@ -96,8 +112,18 @@ def main(argv: list[str] | None = None) -> int:
                     service.send_watchlist(session, watch_notifier, day, now, service.MANUAL, market)
                 )
             for d in dispatches:
-                log.info("manual %s for %s: %s %s", d.kind.lower(), day, d.status, d.error or "")
+                log.info("%smanual %s for %s: %s %s", t, d.kind.lower(), day, d.status, d.error or "")
             return 0 if all(d.status == service.SENT for d in dispatches) else 1
+
+        if not profile.primary:
+            # No Discord for this profile: keep its prices, provents and decisions fresh, once a business day
+            if args.no_refresh or not (args.force or service.refresh_due(session, now)):
+                log.info("%sdata already refreshed (no Discord for this profile)", t)
+                return 0
+            for error in refresh(session):
+                log.warning("%s%s", t, error)
+            log.info("%srefreshed (no Discord for this profile)", t)
+            return 0
 
         run = service.run_scheduled(
             session, notifier, now, refresh=None if args.no_refresh else refresh, force=args.force
@@ -106,12 +132,12 @@ def main(argv: list[str] | None = None) -> int:
             session, watch_notifier, now, force=args.force, kind=service.WATCHLIST, market=market
         )
     for error in run.refresh_errors:
-        log.warning(error)
+        log.warning("%s%s", t, error)
     if run.status == "NOT_CONFIGURED":
         log.warning("DISCORD_WEBHOOK_URL não configurada em backend/.env — relatório não enviado")
         return 0
     for name, r in (("report", run), ("watchlist", watch)):
-        log.info("%s for %s: %s%s %s", name, r.day, r.status, " (late)" if r.late else "", r.error or "")
+        log.info("%s%s for %s: %s%s %s", t, name, r.day, r.status, " (late)" if r.late else "", r.error or "")
     return 1 if service.FAILED in (run.status, watch.status) else 0
 
 

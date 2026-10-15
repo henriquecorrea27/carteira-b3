@@ -5,13 +5,17 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from typing import Annotated
 from zoneinfo import ZoneInfo
 
+from fastapi import Depends
 from sqlalchemy import exists, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import ReportDispatch, WatchlistItem
+from app.core.profiles import Profile, current_profile
+from app.market_data.service import SOURCE_PRICES
+from app.models import DataSourceStatus, ReportDispatch, WatchlistItem
 from app.notifications.base import Notifier, NotifierError, split_message
 from app.notifications.discord import DiscordNotifier
 from app.notifications.report import build_report, is_business_day, last_business_day, render
@@ -36,20 +40,27 @@ def report_time() -> time:
     return time(int(hours), int(minutes))
 
 
-def get_notifier() -> Notifier | None:
+def get_notifier(profile: Annotated[Profile, Depends(current_profile)]) -> Notifier | None:
+    """Discord is configured for the first profile only (the others have no notifications yet)."""
+    if not profile.primary:
+        return None
     url = get_settings().discord_webhook_url.strip()
     return DiscordNotifier(url) if url else None
 
 
-def watchlist_channel() -> str | None:
+def watchlist_channel(profile: Profile) -> str | None:
     """SEPARATE: its own webhook · SHARED: the daily report's channel · None: no webhook at all."""
+    if not profile.primary:
+        return None
     settings = get_settings()
     if settings.discord_watchlist_webhook_url.strip():
         return "SEPARATE"
     return "SHARED" if settings.discord_webhook_url.strip() else None
 
 
-def get_watchlist_notifier() -> Notifier | None:
+def get_watchlist_notifier(profile: Annotated[Profile, Depends(current_profile)]) -> Notifier | None:
+    if not profile.primary:
+        return None
     settings = get_settings()
     url = settings.discord_watchlist_webhook_url.strip() or settings.discord_webhook_url.strip()
     return DiscordNotifier(url, username="Carteira B3 · MM200") if url else None
@@ -211,6 +222,20 @@ def run_scheduled(
         finally:
             lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": key})
             lock_conn.commit()
+
+
+def refresh_due(session: Session, now: datetime | None = None) -> bool:
+    """Profiles without Discord still get the daily refresh (prices → provents → decisions) once per business
+    day: due when the last successful price refresh is older than the latest report time that has passed."""
+    now = now or local_now()
+    at = report_time()
+    due_at = datetime.combine(due_report_date(now, at), at)
+    last = session.scalar(
+        select(DataSourceStatus.last_success_at).where(DataSourceStatus.source == SOURCE_PRICES)
+    )
+    if last is None:
+        return True
+    return last.astimezone(ZoneInfo(get_settings().timezone)).replace(tzinfo=None) < due_at
 
 
 def manual_day(now: datetime) -> date:

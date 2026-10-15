@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.portfolio import get_market_provider
 from app.core.config import get_settings
 from app.core.db import get_session
+from app.core.profiles import Profile, current_profile
 from app.models import PriceHistory, WatchlistItem
 from app.notifications import service
 from app.notifications.base import split_message
@@ -30,6 +31,7 @@ router = APIRouter(tags=["watchlist"])
 SessionDep = Annotated[Session, Depends(get_session)]
 MarketDep = Annotated[object, Depends(get_market_provider)]
 WatchNotifierDep = Annotated[object, Depends(service.get_watchlist_notifier)]
+ProfileDep = Annotated[Profile, Depends(current_profile)]
 
 
 def _round(value: Decimal | None, places: str) -> Decimal | None:
@@ -64,14 +66,14 @@ def _line(session: Session, ticker: str) -> WatchItemOut:
 
 
 @router.get("/watchlist", response_model=WatchlistOut)
-def get_watchlist(session: SessionDep, market: MarketDep):
+def get_watchlist(session: SessionDep, market: MarketDep, profile: ProfileDep):
     """Every ticker with its distance from the SMA (price history re-synced once a day per ticker)."""
     now = service.local_now()
     lim = limits()
     last = service.last_sent(session, kind=service.WATCHLIST)
     return WatchlistOut(
         items=[_out(w) for w in watch_lines(session, now.date(), market)],
-        channel=service.watchlist_channel(),
+        channel=service.watchlist_channel(profile),
         report_time=get_settings().report_time,
         sma_days=lim.sma_days,
         cheap=lim.cheap,
@@ -118,7 +120,7 @@ def remove_from_watchlist(ticker: str, session: SessionDep):
 
 
 @router.get("/watchlist/preview", response_model=WatchlistPreviewOut)
-def preview_watchlist(session: SessionDep):
+def preview_watchlist(session: SessionDep, profile: ProfileDep):
     """The alert as it would be sent now (cached prices; GET /watchlist refreshes them)."""
     now = service.local_now()
     day = service.manual_day(now)
@@ -127,7 +129,7 @@ def preview_watchlist(session: SessionDep):
         date=day,
         content=content,
         messages=split_message(content, DiscordNotifier.max_length),
-        channel=service.watchlist_channel(),
+        channel=service.watchlist_channel(profile),
     )
 
 

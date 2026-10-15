@@ -13,6 +13,7 @@ from app.api import (
     fundamentals,
     imports,
     portfolio,
+    profiles,
     report,
     transactions,
     watchlist,
@@ -59,6 +60,7 @@ app.include_router(fundamentals.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(report.router, prefix="/api")
 app.include_router(watchlist.router, prefix="/api")
+app.include_router(profiles.router, prefix="/api")
 
 # Built frontend (npm run build), so the desktop shortcut needs a single process on :8000.
 # In development the Vite dev server (:5180) is used instead.

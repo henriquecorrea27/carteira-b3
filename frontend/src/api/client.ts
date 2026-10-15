@@ -1,5 +1,7 @@
 /** Minimal typed fetch client. All endpoints live under /api (proxied to FastAPI in dev). */
 
+import { currentProfileId } from "./profile";
+
 export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
@@ -27,11 +29,15 @@ function buildUrl(path: string, query?: Query): string {
 
 async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
   const isForm = body instanceof FormData;
+  const headers: Record<string, string> = {};
+  if (body && !isForm) headers["Content-Type"] = "application/json";
+  const profile = currentProfileId();
+  if (profile) headers["X-Profile"] = profile; // which portfolio (database) the backend reads and writes
   let response: Response;
   try {
     response = await fetch(buildUrl(path, query), {
       method,
-      headers: body && !isForm ? { "Content-Type": "application/json" } : undefined,
+      headers,
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
   } catch {

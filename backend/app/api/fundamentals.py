@@ -6,33 +6,34 @@ from sqlalchemy.orm import Session
 
 from app.api.corporate_events import get_events_source
 from app.api.portfolio import get_market_provider
-from app.core.db import SessionLocal, get_session
+from app.core.db import get_session, session_for
+from app.core.profiles import Profile, current_profile
 from app.fundamentals import service
 from app.schemas.fundamentals import FundamentalsOut, IndicatorOut, IngestOut
 
 router = APIRouter(prefix="/fundamentals", tags=["fundamentals"])
 SessionDep = Annotated[Session, Depends(get_session)]
 log = logging.getLogger(__name__)
-_running = {"ingest": False}
+_running: set[str] = set()  # profiles with an ingestion in progress
 
 
-def _run_ingest() -> None:
+def _run_ingest(profile: Profile) -> None:
     try:
-        with SessionLocal() as session:
+        with session_for(profile) as session:
             service.ingest(session)
     except Exception:
         log.exception("CVM ingestion failed")
     finally:
-        _running["ingest"] = False
+        _running.discard(profile.id)
 
 
 @router.post("/ingest", response_model=IngestOut, status_code=status.HTTP_202_ACCEPTED)
-def ingest(background: BackgroundTasks):
+def ingest(background: BackgroundTasks, profile: Annotated[Profile, Depends(current_profile)]):
     """Downloads and processes CVM data in the background (about a minute)."""
-    if _running["ingest"]:
+    if profile.id in _running:
         return IngestOut(started=False, message="ingestão já em andamento")
-    _running["ingest"] = True
-    background.add_task(_run_ingest)
+    _running.add(profile.id)
+    background.add_task(_run_ingest, profile)
     return IngestOut(started=True, message="ingestão iniciada")
 
 

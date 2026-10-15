@@ -25,9 +25,9 @@ HISTORY_DAYS = (
     6 * 365 + 31
 )  # synced once a day: year-end closes of the indicator history (6 DFPs) and the 5y chart
 
-# Ticker → (day, days) of its last re-sync with the provider (once a day per process is enough, unless a
-# longer history is asked for later that day)
-_synced: dict[str, tuple[date, int]] = {}
+# (database, ticker) → (day, days) of its last re-sync with the provider (once a day per process is enough,
+# unless a longer history is asked for later that day). Per database: each profile has its own price cache.
+_synced: dict[tuple[str, str], tuple[date, int]] = {}
 
 
 @dataclass
@@ -56,7 +56,8 @@ def analyze(
 def sync_history(session: Session, ticker: str, market, today: date, days: int = HISTORY_DAYS) -> None:
     """Fetches the last `days` of daily bars once a day per ticker: fills gaps (history older than the
     ~2 months cached for the liquidity) and re-syncs the split-adjusted closes. Failure keeps the cache."""
-    done = _synced.get(ticker)
+    key = (session.get_bind().url.render_as_string(), ticker)
+    done = _synced.get(key)
     if market is None or (done is not None and done[0] == today and done[1] >= days):
         return
     try:
@@ -64,7 +65,7 @@ def sync_history(session: Session, ticker: str, market, today: date, days: int =
     except MarketDataError as err:
         log.warning("price history for %s failed: %s", ticker, err)
         return
-    _synced[ticker] = (today, days)
+    _synced[key] = (today, days)
 
 
 def technical_for(session: Session, ticker: str, market, today: date, cfg: dict) -> Technical | None:
