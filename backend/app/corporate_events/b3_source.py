@@ -163,6 +163,10 @@ class B3CorporateEventsSource:
             raise CorporateEventsError(f"B3 indisponível: {err}") from err
         if response.status_code != 200:
             raise CorporateEventsError(f"B3 respondeu {response.status_code} para {issuer}")
+        # An issuer no longer listed (delisted, renamed like VIIA → BHIA) or a fund (FIIs are on another B3
+        # page) comes back as 200 with an empty body: nothing to fetch, not a failure
+        if not response.text.strip():
+            return []
         try:
             payload = response.json()
         except ValueError as err:

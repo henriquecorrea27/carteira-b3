@@ -5,12 +5,13 @@ from datetime import date
 from decimal import Decimal as D
 from pathlib import Path
 
+import httpx
 import pytest
 from sqlalchemy import select
 
 from app.core.calendar import next_business_day
 from app.corporate_events import service
-from app.corporate_events.b3_source import isin_to_ticker, parse_supplement
+from app.corporate_events.b3_source import B3CorporateEventsSource, isin_to_ticker, parse_supplement
 from app.models import CorporateEvent, Transaction
 from app.portfolio import service as ledger
 from app.portfolio.types import TransactionSource
@@ -241,3 +242,21 @@ def test_agenda_lists_future_data_com_with_estimate(session):
     assert future and not future[0].in_ledger
     # 10 × 1,17 = 11,70, income is exempt
     assert future[0].estimated_net == D("11.70")
+
+
+def test_families_group_tickers_linked_by_ticker_changes():
+    rows = [
+        Transaction(ticker="AAAA3", target_ticker=None),
+        Transaction(ticker="AAAA3", target_ticker="BBBB3"),  # incorporation
+        Transaction(ticker="BBBB3", target_ticker="CCCC3"),
+        Transaction(ticker="WEGE3", target_ticker=None),
+    ]
+    families = service._families(rows)
+    assert families["AAAA3"] == families["CCCC3"] == {"AAAA3", "BBBB3", "CCCC3"}
+    assert families["WEGE3"] == {"WEGE3"}
+
+
+def test_issuer_missing_from_the_b3_listing_has_no_events():
+    # Real answer for VIIA (renamed BHIA) and FIIs: HTTP 200, empty text/plain body
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="")))
+    assert B3CorporateEventsSource(client).events_for_issuer("VIIA") == []

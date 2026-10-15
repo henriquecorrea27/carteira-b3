@@ -490,3 +490,29 @@ def test_price_bars_endpoint(client, ingested):
     bars = client.get("/api/prices/CMIG4").json()
     assert [b["close"] for b in bars] == ["12", "12", "12"]
     assert bars[0]["high"] == "13"
+
+
+def test_prefetched_market_serves_covered_windows_and_delegates_the_rest():
+    from app.market_data.base import DailyBar
+
+    class Market:
+        name = "fake"
+
+        def __init__(self):
+            self.asked = []
+
+        def daily_bars(self, tickers, start, end):
+            self.asked.append((tuple(tickers), start, end))
+            return {}
+
+    bars = [DailyBar(date(2026, 10, d), D(10 + d), D(10 + d), D(1)) for d in (1, 2, 5)]
+    market = Market()
+    wrapped = rules._Prefetched(market, {"WEGE3": (date(2026, 1, 1), date(2026, 10, 5), bars)})
+    assert wrapped.name == "fake"
+    got = wrapped.daily_bars(["WEGE3"], date(2026, 10, 2), date(2026, 10, 5))
+    assert [b.date.day for b in got["WEGE3"]] == [2, 5]
+    assert wrapped.daily_bars(["WEGE3"], date(2026, 10, 3), date(2026, 10, 4)) == {}
+    assert market.asked == []  # both answered from the prefetched bars
+    wrapped.daily_bars(["WEGE3"], date(2025, 12, 1), date(2026, 10, 5))  # starts before the window
+    wrapped.daily_bars(["PETR4"], date(2026, 10, 1), date(2026, 10, 5))
+    assert [a[0] for a in market.asked] == [("WEGE3",), ("PETR4",)]

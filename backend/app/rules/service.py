@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.core.parallel import fetch_all
 from app.fundamentals import service as fundamentals
 from app.fundamentals.indicators import apply_year_prices
 from app.market_data.base import MarketDataError
@@ -53,12 +54,16 @@ def analyze(
     return result
 
 
+def _synced_today(session: Session, ticker: str, today: date, days: int) -> bool:
+    done = _synced.get((session.get_bind().url.render_as_string(), ticker))
+    return done is not None and done[0] == today and done[1] >= days
+
+
 def sync_history(session: Session, ticker: str, market, today: date, days: int = HISTORY_DAYS) -> None:
     """Fetches the last `days` of daily bars once a day per ticker: fills gaps (history older than the
     ~2 months cached for the liquidity) and re-syncs the split-adjusted closes. Failure keeps the cache."""
     key = (session.get_bind().url.render_as_string(), ticker)
-    done = _synced.get(key)
-    if market is None or (done is not None and done[0] == today and done[1] >= days):
+    if market is None or _synced_today(session, ticker, today, days):
         return
     try:
         fundamentals.fetch_range(session, market, ticker, today - timedelta(days=days), today, resync=True)
@@ -136,6 +141,7 @@ def analyze_portfolio(session: Session, market=None, events=None, today: date | 
     entries = [t.to_entry() for t in session.scalars(select(Transaction))]
     held = sorted(p.ticker for p in build_portfolio(entries).open_positions)
     stocks = set(portfolio_stock_tickers(session))
+    market = prefetch(session, market, [t for t in held if t in stocks], today)
     for ticker in held:
         if ticker not in stocks:
             run.skipped.append(ticker)
@@ -148,6 +154,44 @@ def analyze_portfolio(session: Session, market=None, events=None, today: date | 
             log.exception("analysis of %s failed", ticker)
             run.errors.append(f"{ticker}: {err}")
     return run
+
+
+class _Prefetched:
+    """Market provider that answers from bars fetched beforehand when they cover the asked window."""
+
+    def __init__(self, market, windows: dict[str, tuple[date, date, list]]):
+        self._market, self._windows = market, windows
+
+    def __getattr__(self, name):
+        return getattr(self._market, name)
+
+    def daily_bars(self, tickers: list[str], start: date, end: date):
+        window = self._windows.get(tickers[0]) if len(tickers) == 1 else None
+        if window is None or start < window[0] or end > window[1]:
+            return self._market.daily_bars(tickers, start, end)
+        bars = [b for b in window[2] if start <= b.date <= end]
+        return {tickers[0]: bars} if bars else {}
+
+
+def prefetch(session: Session, market, tickers: list[str], today: date):
+    """Fetches in parallel, up front, the bars the analyses of `tickers` will ask for one by one: the
+    ~6-year history of each stock (once a day) and the recent quotes of its other share classes."""
+    if market is None or not tickers:
+        return market
+    wanted = {
+        t: today - timedelta(days=HISTORY_DAYS)
+        for t in tickers
+        if not _synced_today(session, t, today, HISTORY_DAYS)
+    }
+    companies = select(CompanyTicker.cnpj).where(CompanyTicker.ticker.in_(tickers))
+    for sibling, share_class in session.execute(
+        select(CompanyTicker.ticker, CompanyTicker.share_class).where(CompanyTicker.cnpj.in_(companies))
+    ):
+        if share_class in ("ON", "PN") and sibling not in tickers:
+            wanted.setdefault(sibling, today - timedelta(days=fundamentals.LIQUIDITY_DAYS + 7))
+    fetched = fetch_all(lambda t: market.daily_bars([t], wanted[t], today).get(t, []), wanted)
+    windows = {t: (wanted[t], today, bars) for t, bars in fetched.items() if not isinstance(bars, Exception)}
+    return _Prefetched(market, windows)
 
 
 def latest_snapshots(session: Session, tickers: list[str] | None = None) -> dict[str, AnalysisSnapshot]:

@@ -61,9 +61,13 @@ class YFinanceProvider:
         if hist.empty:
             return []
         hist.index = pd.DatetimeIndex([ts.date() for ts in hist.index])
-        # Splits after `end` also affect the adjusted closes inside the window
-        splits = handle.splits
-        splits.index = pd.DatetimeIndex([ts.date() for ts in splits.index])
+        # Every split after a day affects its adjusted close. A window that reaches today already has them all
+        # in its own "Stock Splits" column; an older window needs the full list (one more request).
+        if end >= date.today() and "Stock Splits" in hist:
+            splits = hist["Stock Splits"][hist["Stock Splits"] > 0]
+        else:
+            splits = handle.splits
+            splits.index = pd.DatetimeIndex([ts.date() for ts in splits.index])
         raw = unadjust(hist["Close"], splits[splits.index > hist.index.min()])
         bars = []
         for day, row in hist.iterrows():

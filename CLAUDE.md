@@ -209,6 +209,12 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 - Cada atualização busca de novo os últimos 7 dias já em cache (`market_data.service.REVISE`): uma linha gravada
   durante o pregão guarda um preço intradiário e precisa ser trocada pelo fechamento.
 - Histórico diário desde a primeira operação, para evolução do patrimônio e TWR.
+- Posição encerrada só é buscada até o histórico cobrir a data em que foi zerada (depois não muda mais).
+- Desempenho (carteira com ~200 ativos no histórico): buscas externas em paralelo (`app/core/parallel.py`, só a rede
+  roda nas threads; o banco fica na thread do chamador), cotações gravadas em lote (`market_data.service.store_bars`)
+  e a análise da carteira pré-busca em paralelo o histórico de 6 anos de cada ação (`rules.service.prefetch`).
+  Desdobramentos vêm da coluna "Stock Splits" da própria consulta quando a janela chega a hoje (uma requisição a
+  menos por ativo).
 
 ### 3.9 Proventos e eventos corporativos automáticos
 **Objetivo:** o usuário só lança compras e vendas; proventos, desdobramentos, grupamentos e bonificações entram sozinhos.
@@ -240,6 +246,10 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 - Evento já presente no livro (importado da B3 ou manual, mesmo ticker/tipo, valor por ação ≈ e pagamento
   em até 5 dias; eventos em ações até 30 dias após a data-com) não é gerado de novo; linhas importadas
   recebem a data-com (proventos) ou a data-ex (eventos em ações).
+- Busca na B3 em paralelo (6 por vez). Emissor fora da lista da B3 (deslistado, renomeado, FII) volta como 200 com
+  corpo vazio: sem eventos, não é falha.
+- `apply_events` calcula a posição na data-com refazendo só os lançamentos da "família" do ativo (ligados por troca
+  de ticker), não o livro inteiro: mesmo resultado, ~25× mais rápido numa carteira grande.
 - Data-ex = próximo dia útil da B3 após a data-com (`app/core/calendar.py`, feriados nacionais + 24 e 31/12).
 - Excluir um lançamento `AUTO` dispensa o evento para sempre; editar marca `user_edited` e o job não toca mais.
 - Importar Movimentação depois: proventos que casam com `AUTO` não editado substituem o `AUTO`; com `AUTO`

@@ -10,8 +10,10 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.market_data.base import MarketDataError, MarketDataProvider, RatesProvider
+from app.core.parallel import fetch_all
+from app.market_data.base import DailyBar, MarketDataError, MarketDataProvider, RatesProvider
 from app.models import BenchmarkHistory, DataSourceStatus, PriceHistory, Transaction
+from app.portfolio.engine import LedgerError, build_portfolio
 from app.portfolio.performance import PriceBook
 
 log = logging.getLogger(__name__)
@@ -55,6 +57,27 @@ def tracked_tickers(session: Session) -> dict[str, date]:
     return first
 
 
+def _ledger_ends(session: Session) -> dict[str, date]:
+    """Last ledger date of every ticker (sale, provent, event...)."""
+    last: dict[str, date] = {}
+    for ticker, target, day in session.execute(
+        select(Transaction.ticker, Transaction.target_ticker, Transaction.date)
+    ):
+        for t in (ticker, target):
+            if t and (t not in last or day > last[t]):
+                last[t] = day
+    return last
+
+
+def _held(session: Session) -> set[str] | None:
+    """Open positions; None when the ledger does not replay (then every ticker is refreshed)."""
+    try:
+        entries = [t.to_entry() for t in session.scalars(select(Transaction))]
+        return {p.ticker for p in build_portfolio(entries).open_positions}
+    except LedgerError:
+        return None
+
+
 def _last_dates(session: Session) -> dict[str, date]:
     rows = session.execute(
         select(PriceHistory.ticker, func.max(PriceHistory.date)).group_by(PriceHistory.ticker)
@@ -62,48 +85,68 @@ def _last_dates(session: Session) -> dict[str, date]:
     return dict(rows.all())
 
 
+BAR_COLUMNS = ("close", "close_adjusted", "volume", "open", "high", "low")
+
+
+def store_bars(
+    session: Session,
+    ticker: str,
+    bars: list[DailyBar],
+    source: str,
+    update: tuple[str, ...] = (),
+    recent_update: tuple[str, ...] = (),
+    recent_from: date | None = None,
+) -> None:
+    """Writes daily bars with one statement per group (a statement per row made a 6-year sync slow).
+    A cached row gets the `update` columns rewritten (nothing when empty); rows on or after `recent_from`
+    also the `recent_update` ones."""
+    rows = [
+        {"ticker": ticker, "date": b.date, "source": source} | {c: getattr(b, c) for c in BAR_COLUMNS}
+        for b in bars
+    ]
+    if recent_from is None:
+        groups = [(rows, update)]
+    else:
+        groups = [
+            ([r for r in rows if r["date"] < recent_from], update),
+            ([r for r in rows if r["date"] >= recent_from], update + recent_update),
+        ]
+    for group, columns in groups:
+        if not group:
+            continue
+        stmt = insert(PriceHistory)
+        if columns:
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["ticker", "date"], set_={c: stmt.excluded[c] for c in columns}
+            )
+        else:
+            stmt = stmt.on_conflict_do_nothing(index_elements=["ticker", "date"])
+        session.execute(stmt, group)
+
+
 def refresh_prices(session: Session, provider: MarketDataProvider, today: date) -> RefreshResult:
+    """Open positions are fetched again every time; a closed position only until its history covers the
+    day it was closed. The fetches run in parallel, the writes here."""
     result = RefreshResult()
     last = _last_dates(session)
-    failed: list[str] = []
+    held, ledger_end = _held(session), _ledger_ends(session)
+    starts: dict[str, date] = {}
     for ticker, first_day in sorted(tracked_tickers(session).items()):
-        start = min(last[ticker], today) - REVISE if ticker in last else first_day - _LOOKBACK
-        try:
-            bars = provider.daily_bars([ticker], start, today).get(ticker, [])
-        except MarketDataError as err:
+        if held is not None and ticker not in held and ticker in last and last[ticker] >= ledger_end[ticker]:
+            continue
+        starts[ticker] = min(last[ticker], today) - REVISE if ticker in last else first_day - _LOOKBACK
+    fetched = fetch_all(lambda t: provider.daily_bars([t], starts[t], today).get(t, []), starts)
+    failed: list[str] = []
+    for ticker in starts:
+        bars = fetched[ticker]
+        if isinstance(bars, Exception):
             failed.append(ticker)
-            log.warning("prices for %s failed: %s", ticker, err)
+            log.warning("prices for %s failed: %s", ticker, bars)
             continue
         if not bars and ticker not in last:
             result.tickers_without_data.append(ticker)
-        for bar in bars:
-            stmt = insert(PriceHistory).values(
-                ticker=ticker,
-                date=bar.date,
-                close=bar.close,
-                close_adjusted=bar.close_adjusted,
-                volume=bar.volume,
-                open=bar.open,
-                high=bar.high,
-                low=bar.low,
-                source=provider.name,
-            )
-            session.execute(
-                stmt.on_conflict_do_update(
-                    index_elements=["ticker", "date"],
-                    set_={
-                        "close": stmt.excluded.close,
-                        "close_adjusted": stmt.excluded.close_adjusted,
-                        "volume": stmt.excluded.volume,
-                        "open": stmt.excluded.open,
-                        "high": stmt.excluded.high,
-                        "low": stmt.excluded.low,
-                        "source": stmt.excluded.source,
-                    },
-                )
-            )
-            if ticker not in last or bar.date > last[ticker]:
-                result.prices_inserted += 1
+        store_bars(session, ticker, bars, provider.name, update=(*BAR_COLUMNS, "source"))
+        result.prices_inserted += sum(1 for b in bars if ticker not in last or b.date > last[ticker])
     if failed:
         result.errors.append(f"preços indisponíveis para: {', '.join(failed)}")
     message = result.errors[-1] if failed else None

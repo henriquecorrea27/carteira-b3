@@ -23,7 +23,8 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.corporate_events.base import CorporateEventsError, CorporateEventsSource
+from app.core.parallel import fetch_all
+from app.corporate_events.base import CorporateEventsSource
 from app.market_data.service import record_status, tracked_tickers
 from app.models import CorporateEvent, Transaction
 from app.portfolio.engine import LedgerError, build_portfolio
@@ -39,6 +40,8 @@ SOURCE_STATUS = "corporate_events"
 # Imported rows are credited a few days after the data-com / payment date
 _CASH_MATCH_DAYS = 5
 _STOCK_MATCH_DAYS = 30
+# Parallel requests to the B3 site (kept low: it is a public site, not an API)
+_B3_WORKERS = 6
 
 
 @dataclass
@@ -63,12 +66,12 @@ def sync(session: Session, source: CorporateEventsSource, today: date | None = N
     result = SyncResult()
     issuers = sorted({ticker[:4] for ticker in relevant_tickers(session, today or date.today())})
     now = datetime.now(UTC)
+    fetched = fetch_all(source.events_for_issuer, issuers, workers=_B3_WORKERS)
     for issuer in issuers:
-        try:
-            events = source.events_for_issuer(issuer)
-        except CorporateEventsError as err:
-            log.warning("corporate events for %s failed: %s", issuer, err)
-            result.errors.append(f"{issuer}: {err}")
+        events = fetched[issuer]
+        if isinstance(events, Exception):
+            log.warning("corporate events for %s failed: %s", issuer, events)
+            result.errors.append(f"{issuer}: {events}")
             continue
         result.issuers += 1
         for ev in events:
@@ -113,6 +116,27 @@ def _stock_matches(row: Transaction, ev: CorporateEvent) -> bool:
         and row.ticker == ev.ticker
         and ev.record_date <= row.date <= ev.record_date + timedelta(days=_STOCK_MATCH_DAYS)
     )
+
+
+def _families(rows: Sequence[Transaction]) -> dict[str, frozenset[str]]:
+    """Tickers linked by ticker changes (incorporations): a position only depends on the rows of its family,
+    so a replay of the family gives the same quantities as a replay of the whole ledger."""
+    parent: dict[str, str] = {}
+
+    def root(t: str) -> str:
+        while parent.setdefault(t, t) != t:
+            parent[t] = parent[parent[t]]
+            t = parent[t]
+        return t
+
+    for r in rows:
+        root(r.ticker)
+        if r.target_ticker:
+            parent[root(r.ticker)] = root(r.target_ticker)
+    groups: dict[str, set[str]] = {}
+    for t in parent:
+        groups.setdefault(root(t), set()).add(t)
+    return {t: frozenset(groups[root(t)]) for t in parent}
 
 
 def _replays(rows: Sequence[Transaction]) -> bool:
@@ -173,6 +197,7 @@ def apply_events(session: Session, today: date | None = None) -> ApplyResult:
     # Stock events first on the same day: they change the quantity provents are computed on
     events.sort(key=lambda ev: (ev.ex_date, ev.category != "STOCK", ev.record_date))
     rows = list(session.scalars(select(Transaction)))
+    families = _families(rows)
     auto_by_key = {r.dedup_hash: r for r in rows if r.source == TransactionSource.AUTO.value and r.dedup_hash}
     used: set[int] = set()
 
@@ -183,7 +208,8 @@ def apply_events(session: Session, today: date | None = None) -> ApplyResult:
         # Position at the end of the data-com is only known after it; until then it is agenda-only
         if ev.dismissed or ev.record_date >= today:
             continue
-        others = [r for r in rows if r is not current]
+        family = families.get(ev.ticker, frozenset({ev.ticker}))
+        others = [r for r in rows if r is not current and r.ticker in family]
         try:
             held = (
                 build_portfolio([r.to_entry() for r in others], until=ev.record_date)
@@ -220,7 +246,7 @@ def apply_events(session: Session, today: date | None = None) -> ApplyResult:
                 if r.source == TransactionSource.B3.value and not r.user_edited and r.date != target:
                     previous = r.date
                     r.date = target
-                    if ev.category == "STOCK" and not _replays(rows):
+                    if ev.category == "STOCK" and not _replays([r for r in rows if r.ticker in family]):
                         r.date = previous
                     else:
                         result.enriched += 1
@@ -231,7 +257,7 @@ def apply_events(session: Session, today: date | None = None) -> ApplyResult:
         _fill_auto(tx, ev, held, today)
         if current is None:
             rows.append(tx)
-        if ev.category == "STOCK" and not _replays(rows):
+        if ev.category == "STOCK" and not _replays([r for r in rows if r.ticker in family]):
             result.skipped.append(f"{ev.ticker} {ev.label} {ev.record_date:%d/%m/%Y}: quebraria o livro")
             if current is None:
                 rows.remove(tx)

@@ -254,3 +254,41 @@ def test_parse_sgs_real_response():
     payload = json.loads((Path(__file__).parent / "fixtures" / "bcb" / "sgs12_sample.json").read_text())
     rows = parse_sgs(payload)
     assert rows[0] == (date(2026, 9, 25), D("0.050788"))
+
+
+class CountingMarket(FakeMarket):
+    def __init__(self, closes):
+        super().__init__(closes)
+        self.asked: list[str] = []
+
+    def daily_bars(self, tickers, start, end):
+        self.asked += tickers
+        return super().daily_bars(tickers, start, end)
+
+
+def test_refresh_skips_closed_positions_once_their_history_is_complete(client):
+    items = [
+        {"date": days_ago(30).isoformat(), "ticker": "WEGE3", "type": "BUY", "quantity": "10", "price": "40"},
+        {"date": days_ago(30).isoformat(), "ticker": "PETR4", "type": "BUY", "quantity": "10", "price": "30"},
+        {
+            "date": days_ago(10).isoformat(),
+            "ticker": "PETR4",
+            "type": "SELL",
+            "quantity": "10",
+            "price": "35",
+        },
+    ]
+    assert client.post("/api/transactions/batch", json={"items": items}).status_code == 201
+    closes = {
+        "WEGE3": {days_ago(30): "40", TODAY: "50"},
+        "PETR4": {days_ago(30): "30", days_ago(10): "35", TODAY: "36"},
+    }
+    fake = CountingMarket(closes)
+    app.dependency_overrides[get_market_provider] = lambda: fake
+    app.dependency_overrides[get_rates_provider] = lambda: FakeRates()
+
+    client.post("/api/market-data/refresh")
+    assert sorted(fake.asked) == ["PETR4", "WEGE3"]  # first time: PETR4 needs its history up to the sale
+    fake.asked.clear()
+    client.post("/api/market-data/refresh")
+    assert fake.asked == ["WEGE3"]  # sold PETR4 already has prices past the sale: nothing new to fetch
