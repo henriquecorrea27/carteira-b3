@@ -92,10 +92,10 @@ cd frontend && npm run dev                         # UI em http://localhost:5180
 - Referência funcional: Investidor10 (prints enviados pelo usuário); visual **mais moderno e minimalista**.
 
 ### Carteiras (perfis) — pedido do usuário em 14/10/2026
-Mais de uma carteira no mesmo computador (a do usuário e a do pai), **totalmente separadas**
+Mais de uma carteira no mesmo computador (a do usuário e a de um familiar), **totalmente separadas**
 (`app/core/profiles.py`). Ainda é usuário único: só o dono usa, neste computador.
-- `PROFILES=eu:Eu,pai:Pai` no `.env` (vazio = uma carteira só, como antes). **Cada carteira tem o próprio banco**:
-  a primeira usa `DATABASE_URL`; as outras, o mesmo servidor com o nome + `_id` (`carteira_pai`). Nada é
+- `PROFILES=eu:Eu,familiar:Familiar` no `.env` (vazio = uma carteira só, como antes). **Cada carteira tem o próprio banco**:
+  a primeira usa `DATABASE_URL`; as outras, o mesmo servidor com o nome + `_id` (`carteira_familiar`). Nada é
   compartilhado (livro, proventos, decisões, lista de observação, envios); cotações e dados da CVM são buscados de
   novo em cada banco (os arquivos da CVM ficam em cache no disco para todos). Escolhido no lugar de uma coluna de
   perfil em cada tabela: uma consulta sem filtro nunca mistura as carteiras.
@@ -108,7 +108,7 @@ Mais de uma carteira no mesmo computador (a do usuário e a do pai), **totalment
 - UI: seletor ao lado do logo (só com mais de uma carteira), guardado no navegador; trocar cancela e limpa o cache
   do TanStack Query e remonta as telas. As outras carteiras têm uma faixa colorida no topo; Importar mostra
   "Importando para <nome>"; carteira sem operações mostra o convite para importar ou lançar.
-- **Discord só na primeira carteira** (decisão do usuário: o pai não precisa por enquanto). As outras não têm
+- **Discord só na primeira carteira** (decisão do usuário: o familiar não precisa por enquanto). As outras não têm
   botão de relatório nem aviso da lista de observação; o job das 19h só as atualiza (cotações → proventos →
   análise), uma vez por dia útil depois do horário do relatório (`notifications.service.refresh_due`).
 
@@ -124,7 +124,7 @@ Mais de uma carteira no mesmo computador (a do usuário e a do pai), **totalment
 - O motor de carteira (`/portfolio`) é a parte mais crítica: **toda regra de cálculo tem teste com caso numérico fechado** antes de ir para a UI.
 - **Nunca adivinhar o layout de arquivos ou de respostas de APIs não documentadas** (exportações B3, endpoints de proventos). Construir parsers a partir de exemplos reais; se não houver, buscar/pedir o exemplo antes de codar.
 - **Privacidade dos dados do usuário:** arquivos reais enviados pelo usuário (extratos B3 etc., de qualquer carteira) **nunca são commitados** e são **apagados após o uso**. As fixtures em `/tests/fixtures` são **sintéticas**: mesmo layout (colunas, tipos, formatos) do arquivo real, com valores fictícios. Respostas de APIs públicas (B3, CVM) podem ser salvas como fixture.
-- Repositório GitHub **privado**. Antes de cada commit, conferir que nada pessoal entra (`.env`, extratos, dumps do banco, dados da carteira).
+- Repositório GitHub **público**. Antes de cada commit, conferir que nada pessoal entra (`.env`, extratos, dumps do banco, dados da carteira).
 - Falha de fonte externa **nunca derruba o app**: registrar, mostrar aviso na UI e seguir com o último dado em cache.
 
 ---
@@ -181,10 +181,10 @@ A carteira é **derivada do livro de operações** (`transactions`). Posição, 
 2. **Importação B3 — Área do Investidor**:
    - Extrato de **Negociação** → `BUY`/`SELL`.
    - Extrato de **Movimentação** → proventos e eventos efetivamente creditados. **Atenção:** a movimentação também contém linhas de liquidação de compras/vendas que já vêm na Negociação — **não contar duas vezes**.
-   - Layout e tipos de movimentação **validados com os arquivos reais** (08/10/2026) e documentados em
+   - Layout e tipos de movimentação **validados com extratos reais** (08/10/2026, não versionados) e documentados em
      `backend/tests/fixtures/b3/README.md` (fixtures sintéticas com o mesmo layout).
    - **Futuros (WDO, WIN…) são ignorados** nos dois extratos: na Negociação, `Mercado = Futuro`; na Movimentação,
-     `Produto` começa com `Futuro - ` (todas as linhas `Compra`/`Venda` da Movimentação eram futuros).
+     `Produto` começa com `Futuro - ` (as linhas `Compra`/`Venda` da Movimentação não são usadas: a Negociação já traz as ações).
    - Renda fixa (`CDB - …`), direitos de subscrição não exercidos e transferências de custódia também são ignorados.
 3. **Investidor10:** não tem exportação. Descartado como fonte.
 
@@ -548,7 +548,7 @@ Ações que o usuário acompanha (dentro ou fora da carteira), avisadas **só pe
 
 | Fase | Entrega |
 |---|---|
-| **F0** | Setup: repo GitHub privado `carteira-b3`, PostgreSQL 16 nativo + uv, FastAPI + Alembic, frontend Vite + shadcn, README |
+| **F0** | Setup: repo GitHub `carteira-b3` (público), PostgreSQL 16 nativo + uv, FastAPI + Alembic, frontend Vite + shadcn, README |
 | **F1** | Motor de carteira: models, **lançamento manual (individual e em lote)**, PM, eventos manuais — **com testes numéricos** |
 | **F2** | Preços (yfinance + cache), CDI (BCB), painel completo da carteira |
 | **F3** | Proventos e eventos corporativos automáticos (seção 3.9), agenda de proventos, pendências |

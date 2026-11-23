@@ -1,7 +1,7 @@
 # Fixtures B3 (sintéticas)
 
 Geradas por `make_b3_fixtures.py`. Reproduzem **exatamente o layout** dos extratos reais da Área do Investidor B3
-(validado em 08/10/2026 com os arquivos do usuário, que foram apagados depois), com uma **carteira fictícia**.
+(validado em 08/10/2026 com extratos reais, que não são versionados), com uma **carteira fictícia**.
 
 ## Layout real observado
 
@@ -26,11 +26,11 @@ openpyxl é preciso chamar `reset_dimensions()`, senão só a primeira célula �
 
 - `Entrada/Saída`: `Credito` / `Debito` (sem acento).
 - `Produto`: `"TICKER - NOME DA EMPRESA"`; futuros vêm como `"Futuro - WDOV25"`; renda fixa como `"CDB - …"`.
-- O nome da corretora varia (`XP INVESTIMENTOS CCTVM S/A` e `… S/A.`; `AGORA CTVM S/A` e `AGORA CORRETORA …`).
+- O nome da mesma corretora varia entre linhas (com e sem ponto final, abreviado ou por extenso); as fixtures usam nomes genéricos (`CORRETORA A`, `CORRETORA B`…).
 
 | Movimentação | Tratamento |
 |---|---|
-| `Compra` / `Venda` | **Ignorar** — no arquivo real eram 100% futuros (`Produto` = `Futuro - …`, qtd 0, valor `-`) |
+| `Compra` / `Venda` | **Ignorar** — negócios de ações já vêm na Negociação; futuros ficam fora do escopo (`Produto` = `Futuro - …`, qtd 0, valor `-`) |
 | `Transferência - Liquidação` | **Ignorar** — liquidação de negócio que já vem na Negociação (D+2, agregado por dia) |
 | `Transferência` | Ignorar — custódia entre corretoras (não muda a posição) |
 | `Dividendo` | `DIVIDEND`; valor = líquido (= bruto) |
@@ -43,11 +43,11 @@ openpyxl é preciso chamar `reset_dimensions()`, senão só a primeira célula �
 | `Desdobro` | `SPLIT`; quantidade = **ações novas creditadas** (fator vem da fonte de eventos) |
 | `Grupamento` | `REVERSE_SPLIT`; quantidade = **posição resultante** |
 | `Atualização` | Ignorar (informativo, quantidade = posição total) |
-| `Direito de Subscrição`, `Cessão de Direitos(- Solicitada)`, `Direitos de Subscrição - Não Exercido` | Ignorar enquanto não houver exercício (não houve no histórico real) |
+| `Direito de Subscrição`, `Cessão de Direitos(- Solicitada)`, `Direitos de Subscrição - Não Exercido` | Ignorar enquanto não houver exercício (fora do escopo por enquanto) |
 | `RESGATE ANTECIPADO/` (CDB) | Ignorar — renda fixa fora do escopo |
 
-Conferência feita com os dados reais: posições reconstruídas (Negociação + eventos da Movimentação) bateram com o
-Investidor10, e a soma de Dividendo + JCP + Rendimento bateu com o total de proventos (diferença de centavos).
+Conferência feita contra uma carteira real: posições reconstruídas (Negociação + eventos da Movimentação) e soma de
+Dividendo + JCP + Rendimento bateram com a referência externa (diferença de centavos).
 
 ## Carteira fictícia das fixtures — posição final esperada
 | Ticker | Qtd | Observação |
