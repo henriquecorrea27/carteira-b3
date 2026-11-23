@@ -25,15 +25,24 @@ def test_without_profiles_the_app_has_a_single_primary_profile():
 
 
 def test_each_extra_profile_gets_its_own_database_on_the_same_server():
-    me, dad = parse_profiles(" eu:Eu , pai:Pai ", URL, TEST_URL)
+    me, other = parse_profiles(" eu:Eu , familiar:Familiar ", URL, TEST_URL)
     assert (me.id, me.name, me.primary, me.database_url) == ("eu", "Eu", True, URL)
-    assert (dad.id, dad.name, dad.primary, dad.database) == ("pai", "Pai", False, "carteira_pai")
-    dad_url, base = make_url(dad.database_url), make_url(URL)
-    assert (dad_url.username, dad_url.password, dad_url.host) == (base.username, base.password, base.host)
-    assert parse_profiles("eu,mae", URL)[1].name == "Mae"
+    assert (other.id, other.name, other.primary, other.database) == (
+        "familiar",
+        "Familiar",
+        False,
+        "carteira_familiar",
+    )
+    other_url, base = make_url(other.database_url), make_url(URL)
+    assert (other_url.username, other_url.password, other_url.host) == (
+        base.username,
+        base.password,
+        base.host,
+    )
+    assert parse_profiles("eu,amigo", URL)[1].name == "Amigo"
 
 
-@pytest.mark.parametrize("spec", ["eu,Pai!", "eu,eu", "eu,1x", "eu,test"])
+@pytest.mark.parametrize("spec", ["eu,Outro!", "eu,eu", "eu,1x", "eu,test"])
 def test_invalid_profiles_are_rejected(spec):
     # "test" would land on carteira_test, wiped by the test suite
     with pytest.raises(ProfileConfigError):

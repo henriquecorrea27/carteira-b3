@@ -73,9 +73,9 @@ A especificação completa está em [`CLAUDE.md`](CLAUDE.md).
 7. (Opcional) **Mais de uma carteira** (ex.: a sua e a de um familiar), totalmente separadas, cada uma no próprio
    banco. No `backend/.env`:
    ```
-   PROFILES=eu:Eu,pai:Pai
+   PROFILES=eu:Eu,familiar:Familiar
    ```
-   A primeira usa o banco de `DATABASE_URL`; as outras, o mesmo servidor com o nome + `_id` (`carteira_pai`).
+   A primeira usa o banco de `DATABASE_URL`; as outras, o mesmo servidor com o nome + `_id` (`carteira_familiar`).
    Depois rodar (cria os bancos com o superusuário de `POSTGRES_SUPERUSER_PASSWORD`, aplica as migrações em
    todos e carrega os dados da CVM nos novos) e reiniciar o app:
    ```

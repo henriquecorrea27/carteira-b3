@@ -3,10 +3,10 @@ Nothing is shared between them (ledger, provents, decisions, watchlist, dispatch
 never show up in another. Market and CVM data are fetched again per database (the CVM files stay cached on
 disk for all of them).
 
-    PROFILES=eu:Eu,pai:Pai     # in backend/.env; empty → a single profile (the app as before)
+    PROFILES=eu:Eu,familiar:Familiar     # in backend/.env; empty → a single profile (the app as before)
 
 The first profile uses DATABASE_URL; each other one the same server and credentials with the database name
-suffixed by its id (carteira → carteira_pai). Discord notifications are sent for the first profile only.
+suffixed by its id (carteira → carteira_familiar). Discord notifications are sent for the first profile only.
 The UI picks the profile per request with the X-Profile header (absent → the first one)."""
 
 import re

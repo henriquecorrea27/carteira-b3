@@ -89,7 +89,7 @@ export function ProfileMenu() {
   );
 }
 
-/** "Importando para: Pai" and similar notes: names the open portfolio when there is more than one. */
+/** "Importando para: Familiar" and similar notes: names the open portfolio when there is more than one. */
 export function ActiveProfileTag({ prefix }: { prefix: string }) {
   const { active, accent, multiple } = useActiveProfile();
   if (!multiple || !active) return null;

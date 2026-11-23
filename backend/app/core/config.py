@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     database_url_test: str = "postgresql+psycopg://carteira:carteira@localhost:5432/carteira_test"
     # Only to create the database of a new profile (app.jobs.setup_profiles); the app never uses it
     postgres_superuser_password: str = ""
-    # Independent portfolios, each in its own database: "eu:Eu,pai:Pai" (see app.core.profiles)
+    # Independent portfolios, each in its own database: "eu:Eu,familiar:Familiar" (see app.core.profiles)
     profiles: str = ""
     discord_webhook_url: str = ""
     # Watchlist alert (price vs. SMA200): its own channel; empty → same channel as the daily report
